@@ -15,7 +15,8 @@
     "test:sse": "npx tsx scripts/test-sse.ts",
     "test:stream": "npx tsx scripts/test-stream-store.ts",
     "test:attachments": "npx tsx scripts/test-attachments.ts",
-    "test:block": "npx tsx scripts/test-block-layer.ts"
+    "test:block": "npx tsx scripts/test-block-layer.ts",
+    "test:table": "npx tsx scripts/test-table-ops.ts"
   },
   "dependencies": {
     "@types/mdast": "^4.0.4",

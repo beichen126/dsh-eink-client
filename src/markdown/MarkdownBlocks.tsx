@@ -3,6 +3,7 @@ import { createElement, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { parseMarkdown } from './parse'
 import { blockIdOf, tableIdOf, startOf, endOf } from './block-layer'
+import type { Annotation } from '../annotations/annotation-types'
 import css from './markdown.module.css'
 import type { Root } from 'mdast'
 
@@ -37,7 +38,7 @@ function innerBlock(node: any, cur: Cur): ReactNode {
 function innerNodes(nodes: any[], cur: Cur): ReactNode { return nodes.map((n, i) => <span key={i}>{innerBlock(n, cur)}</span>) }
 function innerList(li: any, cur: Cur): ReactNode { return innerNodes(li.children || [], cur) }
 
-function blockEl(node: any, messageId: string): ReactNode {
+function blockEl(node: any, messageId: string, annotations?: Annotation[], onTableAction?: (tableId: string) => void): ReactNode {
   const t = node.type
   const bid = blockIdOf(messageId, t === 'heading' ? 'heading' : t === 'paragraph' ? 'paragraph' : t === 'listItem' ? 'list-item' : t === 'blockquote' ? 'blockquote' : t === 'table' ? 'table' : t === 'code' ? 'code' : 'paragraph', startOf(node), endOf(node))
   if (t === 'heading') { const level = node.depth; const cur: Cur = { v: 0 }; return createElement('h' + Math.min(6, Math.max(1, level)), { 'data-block-id': bid, 'data-block-type': 'heading' }, inlineList(node.children, cur)) }
@@ -48,15 +49,16 @@ function blockEl(node: any, messageId: string): ReactNode {
   if (t === 'table') {
     const tid = tableIdOf(messageId, startOf(node), endOf(node))
     const rows: any[] = node.children || []
-    return (<div className={css.tableScroll} data-table-id={tid} data-block-id={bid} data-block-type='table'><table><tbody>{rows.map((row: any, r: number) => (<tr key={r}>{row.children.map((cell: any, c: number) => { const cur: Cur = { v: 0 }; return <td key={c} data-row={r} data-col={c}>{inlineList(cell.children, cur)}</td> })}</tr>))}</tbody></table></div>)
+    const whole = !!annotations && annotations.some((a: any) => a.target && a.target.type === 'table' && a.target.tableId === tid)
+    const coveredRect = (r: number, c: number) => { if (!annotations) return false; return annotations.some((a: any) => a.target && a.target.type === 'table-cells' && a.target.tableId === tid && r >= a.target.bounds.rowStart && r <= a.target.bounds.rowEnd && c >= a.target.bounds.columnStart && c <= a.target.bounds.columnEnd) }
+    return (<div className={css.tableScroll + (whole ? ' ' + css.studyTableHighlighted : '')} data-table-id={tid} data-block-id={bid} data-block-type='table'>{onTableAction && <button className={css.tableAction} data-table-action={tid} onClick={(e) => { e.stopPropagation(); onTableAction(tid) }}>⋯</button>}<table><tbody>{rows.map((row: any, r: number) => (<tr key={r}>{row.children.map((cell: any, c: number) => { const cur: Cur = { v: 0 }; const hit = whole || coveredRect(r, c); return <td key={c} data-row={r} data-col={c} className={hit ? css.studyCellHighlighted : undefined}>{inlineList(cell.children, cur)}</td> })}</tr>))}</tbody></table></div>)
   }
   if (t === 'code') return <pre data-block-id={bid} data-block-type='code' data-annotatable='false'><code>{node.value || ''}</code></pre>
   return null
 }
 
-export function MarkdownBlocks({ content, messageId }: { content: string; messageId: string }) {
+export function MarkdownBlocks({ content, messageId, annotations, onTableAction }: { content: string; messageId: string; annotations?: Annotation[]; onTableAction?: (tableId: string) => void }) {
   const root = useMemo<Root>(() => parseMarkdown(content), [content])
   const children = (root.children || []) as any[]
-  return <div className={css.markdown} data-message-id={messageId}>{children.map((n, i) => <span key={i}>{blockEl(n, messageId)}</span>)}</div>
+  return <div className={css.markdown} data-message-id={messageId}>{children.map((n, i) => <span key={i}>{blockEl(n, messageId, annotations, onTableAction)}</span>)}</div>
 }
-

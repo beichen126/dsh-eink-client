@@ -1,5 +1,6 @@
 import { getAnnotationsByMessage, saveAnnotations, deleteAnnotationsByIds, deleteConversationAnnotations } from '../storage/storage'
-import { shouldToggleAll, makeAnnotation, normalizeAnchor, sameAnchor, toggleWithin, rebuildQuote } from './annotation-ops'
+import { shouldToggleAll, makeAnnotation, normalizeAnchor, sameAnchor, toggleWithin, rebuildQuote, toggleTableCells as tc, toggleWholeTable as wt } from './annotation-ops'
+import type { TableBounds } from './annotation-types'
 import type { Annotation, TextAnchor } from './annotation-types'
 import type { TextSelectionSegment } from './selection-types'
 
@@ -39,4 +40,18 @@ export async function toggleTextSelection(conversationId: string, messageId: str
   await saveAnnotations(toSave)
   if (toDelete.length) await deleteAnnotationsByIds(toDelete)
   return next
+}
+export async function toggleTableCellsAnnotation(conversationId: string, messageId: string, tableId: string, bounds: TableBounds): Promise<Annotation[]> {
+  const existing = await getAnnotationsByMessage(conversationId, messageId)
+  const { remove, keep } = tc(conversationId, messageId, tableId, bounds, existing)
+  await saveAnnotations(keep)
+  if (remove.length) await deleteAnnotationsByIds(remove.map((a) => a.id))
+  return keep
+}
+export async function toggleWholeTableAnnotation(conversationId: string, messageId: string, tableId: string): Promise<Annotation[]> {
+  const existing = await getAnnotationsByMessage(conversationId, messageId)
+  const { remove, keep } = wt(conversationId, messageId, tableId, existing)
+  await saveAnnotations(keep)
+  if (remove.length) await deleteAnnotationsByIds(remove.map((a) => a.id))
+  return keep
 }

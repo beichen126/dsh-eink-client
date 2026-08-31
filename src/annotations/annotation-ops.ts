@@ -94,3 +94,42 @@ export function shouldToggleAll(segs: { anchor: TextAnchor; start: number; end: 
   return allCovered ? 'remove' : 'add'
 }
 function requote(a: Annotation, canonical: string): Annotation { return { ...a, target: { ...a.target, quote: rebuildQuote(canonical, a.target.start, a.target.end) } } }
+
+import type { TableBounds } from './annotation-types'
+
+/** Normalize two cell points (any drag direction) into a closed rectangle bounds. */
+export function normalizeBounds(ar: number, ac: number, br: number, bc: number): TableBounds {
+  return { rowStart: Math.min(ar, br), rowEnd: Math.max(ar, br), columnStart: Math.min(ac, bc), columnEnd: Math.max(ac, bc) }
+}
+export function sameBounds(a: TableBounds, b: TableBounds): boolean {
+  return a.rowStart === b.rowStart && a.rowEnd === b.rowEnd && a.columnStart === b.columnStart && a.columnEnd === b.columnEnd
+}
+export function boundsCoverCell(b: TableBounds, row: number, col: number): boolean {
+  return row >= b.rowStart && row <= b.rowEnd && col >= b.columnStart && col <= b.columnEnd
+}
+
+/** table-cells toggle: exact duplicate rectangle -> remove; otherwise create (partial overlap coexists, no 2D merge/split). */
+export function toggleTableCells(conversationId: string, messageId: string, tableId: string, bounds: TableBounds, existing: Annotation[]): { remove: Annotation[]; keep: Annotation[]; add: Annotation[] } {
+  const mine = existing.filter((a) => a.target.type === 'table-cells' && a.target.tableId === tableId)
+  const dup = mine.find((a) => sameBounds(a.target.bounds, bounds))
+  if (dup) return { remove: [dup], keep: existing.filter((a) => a.id !== dup.id), add: [] }
+  const now = Date.now()
+  const newAnn: Annotation = { id: newStableId(), conversationId, messageId, target: { type: 'table-cells', tableId, bounds }, createdAt: now, updatedAt: now, version: 1 }
+  return { remove: [], keep: [...existing, newAnn], add: [newAnn] }
+}
+
+/** whole-table toggle: at most one per table; add or remove. */
+export function toggleWholeTable(conversationId: string, messageId: string, tableId: string, existing: Annotation[]): { remove: Annotation[]; keep: Annotation[]; add: Annotation[] } {
+  const existingTable = existing.find((a) => a.target.type === 'table' && a.target.tableId === tableId)
+  if (existingTable) return { remove: [existingTable], keep: existing.filter((a) => a.id !== existingTable.id), add: [] }
+  const now = Date.now()
+  const newAnn: Annotation = { id: newStableId(), conversationId, messageId, target: { type: 'table', tableId }, createdAt: now, updatedAt: now, version: 1 }
+  return { remove: [], keep: [...existing, newAnn], add: [newAnn] }
+}
+
+/** Whether a whole-table annotation exists for a given table. */
+export function hasWholeTable(existing: Annotation[], tableId: string): boolean { return existing.some((a) => a.target.type === 'table' && a.target.tableId === tableId) }
+/** Whether a rectangle annotation equals the given bounds. */
+export function hasExactRectangle(existing: Annotation[], tableId: string, bounds: TableBounds): boolean { return existing.some((a) => a.target.type === 'table-cells' && a.target.tableId === tableId && sameBounds(a.target.bounds, bounds)) }
+/** Whether a rectangle annotation covers a cell. */
+export function rectangleCoversCell(existing: Annotation[], tableId: string, row: number, col: number): boolean { return existing.some((a) => a.target.type === 'table-cells' && a.target.tableId === tableId && boundsCoverCell(a.target.bounds, row, col)) }

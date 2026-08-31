@@ -4,10 +4,11 @@ import { MarkdownBlocks } from '../markdown/MarkdownBlocks'
 import { mapSelection } from './selection-mapper'
 import { resolveToRange } from './range-resolver'
 import { buildBlockMap } from './canonical'
-import { useMessageAnnotations, toggleMessageSelection, refreshMessageAnnotations } from './annotation-store'
+import { useMessageAnnotations, toggleMessageSelection, toggleTableCellsMessage, toggleWholeTableMessage, refreshMessageAnnotations } from './annotation-store'
 import { setMessageRanges, removeMessageRanges, highlightSupported } from './highlight-registry'
-import { shouldToggleAll } from './annotation-ops'
+import { shouldToggleAll, normalizeBounds, hasExactRectangle, hasWholeTable } from './annotation-ops'
 import type { SelectionMapping, TextSelectionSegment } from './selection-types'
+import type { TableBounds } from './annotation-types'
 import css from './annotate.module.css'
 
 export function AnnotatedMarkdown({ content, messageId, conversationId }: { content: string; messageId: string; conversationId: string }) {
@@ -23,7 +24,7 @@ export function AnnotatedMarkdown({ content, messageId, conversationId }: { cont
   useEffect(() => {
     const msgEl = wrapRef.current?.querySelector('[data-message-id]')
     if (!msgEl) return
-    const ranges = annotations.map((a) => resolveToRange(msgEl, messageId, a.target)).filter((r): r is Range => !!r)
+    const ranges = annotations.filter((a) => a.target.type === 'text').map((a) => resolveToRange(msgEl, messageId, a.target as any)).filter((r): r is Range => !!r)
     setMessageRanges(messageId, ranges)
     return () => { removeMessageRanges(messageId) }
   }, [annotations, messageId, content, hasHl])
@@ -44,6 +45,10 @@ export function AnnotatedMarkdown({ content, messageId, conversationId }: { cont
         setPending(result)
         const r = range.getBoundingClientRect()
         setPendingBox({ left: Math.min(r.left + r.width, window.innerWidth - 90), top: Math.max(8, r.top - 44) })
+      } else if (result.kind === 'table-cross-cell') {
+        setPending(result)
+        const r = range.getBoundingClientRect()
+        setPendingBox({ left: Math.min(r.left + r.width, window.innerWidth - 90), top: Math.max(8, r.top - 44) })
       } else { setPending(result); setPendingBox(null) }
     }
     document.addEventListener('selectionchange', onSelChange)
@@ -52,6 +57,7 @@ export function AnnotatedMarkdown({ content, messageId, conversationId }: { cont
     return () => { document.removeEventListener('selectionchange', onSelChange); document.removeEventListener('pointerup', onSelChange); document.removeEventListener('touchend', onSelChange) }
   }, [messageId, content, canonicalOf])
 
+  const markCrossCell = () => { if (!pending || pending.kind !== 'table-cross-cell') return; const a = pending.startCell, b = pending.endCell; const bounds = normalizeBounds(a.row, a.column, b.row, b.column); void toggleTableCellsMessage(conversationId, messageId, pending.tableId, bounds); window.getSelection()?.removeAllRanges(); setPending(null); setPendingBox(null) }
   function doToggle() {
     if (!pending || pending.kind !== 'text') return
     toggleMessageSelection(conversationId, messageId, pending.segments, canonicalOf)
@@ -60,14 +66,15 @@ export function AnnotatedMarkdown({ content, messageId, conversationId }: { cont
   }
   const fullyCovered = pending && pending.kind === 'text' ? shouldToggleAll(pending.segments.map((s) => ({ anchor: s.cell ? { scope: 'table-cell', tableId: s.cell.tableId, row: s.cell.row, column: s.cell.column } : { scope: 'block', blockId: s.blockId }, start: s.start, end: s.end })), annotations) === 'remove' : false
 
+  const onTableAction = (tableId: string) => { void toggleWholeTableMessage(conversationId, messageId, tableId) }
   return (
     <div ref={wrapRef} className={css.wrap} data-highlight={hasHl}>
-      <MarkdownBlocks content={content} messageId={messageId} />
+      <MarkdownBlocks content={content} messageId={messageId} annotations={annotations} onTableAction={onTableAction} />
       {pending && pending.kind === 'text' && pendingBox && (
         <button className={css.annotBtn} style={{ left: pendingBox.left, top: pendingBox.top }} onClick={doToggle}>{fullyCovered ? '取消标记' : '标记'}</button>
       )}
-      {pending && pending.kind === 'table-cross-cell' && (
-        <button className={css.annotBtn} style={{ left: 24, top: 8 }} onClick={() => setPending(null)}>跨单元格标注将在下一阶段支持</button>
+      {pending && pending.kind === 'table-cross-cell' && pendingBox && (
+        <button className={css.annotBtn} style={{ left: pendingBox.left, top: pendingBox.top }} onClick={markCrossCell}>{hasExactRectangle(annotations, pending.tableId, normalizeBounds(pending.startCell.row, pending.startCell.column, pending.endCell.row, pending.endCell.column)) ? '取消标记' : '标记'}</button>
       )}
     </div>
   )

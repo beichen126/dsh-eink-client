@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from 'react'
-import { loadMessageAnnotations, toggleTextSelection } from './annotation-service'
+import { loadMessageAnnotations, toggleTextSelection, toggleTableCellsAnnotation, toggleWholeTableAnnotation } from './annotation-service'
 import type { Annotation } from './annotation-types'
 import type { TextAnchor } from './annotation-types'
 import type { TextSelectionSegment } from './selection-types'
+import type { TableBounds } from './annotation-types'
 
 const key = (c: string, m: string) => c + '::' + m
 const EMPTY: Annotation[] = []
@@ -20,3 +21,9 @@ export async function toggleMessageSelection(conversationId: string, messageId: 
 export function setMessageAnnotations(conversationId: string, messageId: string, anns: Annotation[]): void { cache.set(key(conversationId, messageId), anns); notify() }
 export function dropMessageAnnotations(conversationId: string, messageId: string): void { cache.delete(key(conversationId, messageId)); notify() }
 export { deleteConvAnnotations }
+export async function toggleTableCellsMessage(conversationId: string, messageId: string, tableId: string, bounds: TableBounds): Promise<void> {
+  cache.set(key(conversationId, messageId), await toggleTableCellsAnnotation(conversationId, messageId, tableId, bounds)); notify()
+}
+export async function toggleWholeTableMessage(conversationId: string, messageId: string, tableId: string): Promise<void> {
+  cache.set(key(conversationId, messageId), await toggleWholeTableAnnotation(conversationId, messageId, tableId)); notify()
+}
