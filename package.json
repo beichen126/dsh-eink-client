@@ -1,0 +1,39 @@
+{
+  "name": "dsh-eink-client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Standalone ink-screen AI chat client (deepseek), migrated from the DeepSeek Harness web UI, decoupled from the DSH host/Cordis runtime.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "baseline:dsh": "node scripts/gen-baseline.mjs \"C:\\Users\\lenovo\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\" DSH_BASELINE.json",
+    "verify:dsh": "node scripts/verify-dsh.mjs \"C:\\Users\\lenovo\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\" DSH_BASELINE.json",
+    "test": "npx tsx scripts/test-storage.ts",
+    "test:storage": "npx tsx scripts/test-storage.ts",
+    "test:sse": "npx tsx scripts/test-sse.ts",
+    "test:stream": "npx tsx scripts/test-stream-store.ts",
+    "test:attachments": "npx tsx scripts/test-attachments.ts",
+    "test:block": "npx tsx scripts/test-block-layer.ts"
+  },
+  "dependencies": {
+    "@types/mdast": "^4.0.4",
+    "clsx": "^2.1.1",
+    "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-gfm": "^3.1.0",
+    "micromark-extension-gfm": "^3.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "fake-indexeddb": "^6.2.5",
+    "playwright-core": "^1.62.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.5.4",
+    "vite": "^6.0.0"
+  }
+}

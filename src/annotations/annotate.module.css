@@ -1,0 +1,3 @@
+.wrap { position: relative; }
+.annotBtn { position: fixed; z-index: 1200; padding: 4px 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); font-size: 12px; cursor: pointer; }
+.annotBtn:hover { background: var(--dsw-alias-interactive-bg-hover); }
