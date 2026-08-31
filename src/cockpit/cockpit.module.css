@@ -65,3 +65,19 @@
 .stopBtn:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .assistantBody[data-empty] { min-height: 8px; }
 .photoLoading { display: inline-flex; align-items: center; justify-content: center; width: 120px; height: 90px; color: var(--dsw-alias-label-tertiary); font-size: 12px; }
+.railText { font-size: 12px; }
+.sessionRowWrap { position: relative; border-radius: 10px; }
+.sessionRowWrapActive { background: var(--dsw-alias-button-ghost-active-fill, var(--dsw-alias-interactive-bg-active)); }
+.sessionRowWrapActive .sessionRow { background: transparent; }
+.rowMenu { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); border: none; background: transparent; color: var(--dsw-alias-label-tertiary); cursor: pointer; width: 26px; height: 26px; border-radius: 6px; }
+.rowMenu:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.rowMenuDots { font-size: 14px; letter-spacing: 1px; }
+.sessionRow { width: 100%; padding-right: 30px; }
+.rowConfirm { display: flex; align-items: center; gap: 8px; margin-top: 4px; padding: 6px 8px; border-radius: 8px; background: var(--dsw-alias-bg-layer-2); font-size: 12px; color: var(--dsw-alias-label-secondary); }
+.rowConfirm button { border: 1px solid var(--dsw-alias-border-l2); background: transparent; border-radius: 6px; padding: 2px 8px; cursor: pointer; font-size: 12px; }
+.rowConfirm button:first-of-type { color: var(--dsw-alias-state-error-primary); }
+.promptSection { margin-top: 14px; }
+.promptRow { display: flex; align-items: center; gap: 8px; }
+.promptLabel { font-size: 13px; color: var(--dsw-alias-label-secondary); }
+.promptArea { margin-top: 8px; width: 100%; min-height: 70px; resize: vertical; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); padding: 8px 10px; font-size: 13px; line-height: 20px; font-family: inherit; }
+.promptArea:focus { outline: none; border-color: var(--dsw-alias-brand-primary); }

@@ -14,8 +14,10 @@ export function SettingsDialog() {
   const [test, setTest] = useState<string | null>(null)
   const [testOk, setTestOk] = useState<boolean | null>(null)
   const [saved, setSaved] = useState(false)
+  const [prompt, setPrompt] = useState(s.customSystemPrompt || '')
+  const [promptOn, setPromptOn] = useState(!!s.customSystemPromptEnabled)
 
-  const onSave = async () => { await saveSettings({ apiBaseUrl: base.trim(), apiKey: key.trim(), model: model.trim() }); setSaved(true); setTimeout(() => setSaved(false), 1500) }
+  const onSave = async () => { await saveSettings({ apiBaseUrl: base.trim(), apiKey: key.trim(), model: model.trim(), customSystemPrompt: prompt, customSystemPromptEnabled: promptOn }); setSaved(true); setTimeout(() => setSaved(false), 1500) }
   const onTest = async () => {
     setTest('正在测试…'); setTestOk(null)
     const r = await testConnection({ apiKey: key.trim(), baseUrl: base.trim(), model: model.trim(), messages: [{ role: 'user', content: 'ping' }] })
@@ -28,6 +30,11 @@ export function SettingsDialog() {
       <div className={css.field}><label>API Key</label><Input className={css.fieldInput} type="password" value={key} onChange={e => setKey(e.target.value)} placeholder="sk-..." /></div>
       <div className={css.field}><label>Model</label><Input className={css.fieldInput} value={model} onChange={e => setModel(e.target.value)} placeholder="deepseek-chat" /></div>
       <div className={css.settingsHint}>API Key 仅保存在本机 IndexedDB，不进源码、不走 Git。</div>
+      <div className={css.promptSection}>
+        <div className={css.promptRow}><label className={css.promptLabel}>固定提示词</label><input type="checkbox" checked={promptOn} onChange={e => setPromptOn(e.target.checked)} /></div>
+        <textarea className={css.promptArea} value={prompt} placeholder="每次请求作为 system prompt 注入，例如：回答任何学习问题时，第一行固定写“学习模式：”。" onChange={e => setPrompt(e.target.value)} />
+        <div className={css.settingsHint}>仅保存在本机 IndexedDB，作为全局 system prompt 注入，不进入聊天记录。</div>
+      </div>
       <div className={css.settingsActions}>
         <Button variant="outline" onClick={onTest}>{test ?? '测试连接'}</Button>
         <Button variant="primary" onClick={onSave}>{saved ? '已保存' : '保存'}</Button>

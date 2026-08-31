@@ -9,6 +9,7 @@ import { t } from '../engine/locale'
 import { MessageText, IconCloseOutline16 } from '../dsh/primitives'
 import { ImageLightbox } from '../dsh/attachment/ImageLightbox'
 import { AnnotatedMarkdown } from '../annotations/AnnotatedMarkdown'
+import { galleryActions } from '../gallery/gallery-store'
 import css from './cockpit.module.css'
 
 export function Conversation() {
@@ -20,6 +21,8 @@ export function Conversation() {
   const atBottomRef = useRef(true)
   const onScroll = () => { const el = listRef.current; if (!el) return; atBottomRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 60 }
   const messages = session?.messages ?? []
+  const imageOffsetByMsg: Record<string, number> = {}
+  { let off = 0; for (const m of messages) { if (m.role === 'user') { imageOffsetByMsg[m.id] = off; off += m.images.length } } }
   const lastMsg = messages[messages.length - 1]
   const sig = messages.length + '|' + (lastMsg ? lastMsg.content : '')
   const lastRef = useRef('')
@@ -53,19 +56,19 @@ export function Conversation() {
             <div className={css.emptyTitle}>{t('conversation.emptyHero')}</div>
             <div className={css.emptyHint}>{t('conversation.emptyHint')}</div>
           </div>
-        ) : messages.map(m => <MessageRow key={m.id} m={m} streamingId={activeStreamingId} convId={session?.id} />)}
+        ) : messages.map(m => <MessageRow key={m.id} m={m} streamingId={activeStreamingId} convId={session?.id} imgOffset={imageOffsetByMsg[m.id] || 0} />)}
       </div>
       <Composer sessionId={session?.id} busy={busy} />
     </div>
   )
 }
 
-function MessageRow({ m, streamingId, convId }: { m: any; streamingId?: string; convId?: string }) {
+function MessageRow({ m, streamingId, convId, imgOffset }: { m: any; streamingId?: string; convId?: string; imgOffset: number }) {
   if (m.role === 'user') {
     return (
       <div className={css.msg + ' ' + css.msgUser}>
         <div className={css.bubble}><MessageText text={m.content} /></div>
-        {m.images.length > 0 && <PhotoStrip imageIds={m.images} />}
+        {m.images.length > 0 && <PhotoStrip convId={convId} imageIds={m.images} offset={imgOffset} />}
       </div>
     )
   }
@@ -83,15 +86,11 @@ function MessageRow({ m, streamingId, convId }: { m: any; streamingId?: string; 
   )
 }
 
-function PhotoStrip({ imageIds }: { imageIds: string[] }) {
-  const [open, setOpen] = useState<string | null>(null)
+function PhotoStrip({ imageIds, convId, offset }: { imageIds: string[]; convId?: string; offset: number }) {
   return (
-    <>
-      <div className={css.photoStrip}>
-        {imageIds.map(id => <Thumb key={id} id={id} onOpen={() => setOpen(id)} />)}
-      </div>
-      {open && <Lightbox id={open} onClose={() => setOpen(null)} />}
-    </>
+    <div className={css.photoStrip}>
+      {imageIds.map((id, i) => <Thumb key={id} id={id} onOpen={() => galleryActions.open(convId, offset + i, 'viewer')} />)}
+    </div>
   )
 }
 

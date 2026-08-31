@@ -1,6 +1,6 @@
 
 import type { Root, BlockContent, Literal, Text, Table, TableCell, TableRow, Heading, ListItem } from 'mdast'
-export type BlockType = 'heading' | 'paragraph' | 'list-item' | 'blockquote' | 'table' | 'code'
+export type BlockType = 'heading' | 'paragraph' | 'list-item' | 'blockquote' | 'table' | 'code' | 'math'
 export type BlockModel = {
   id: string
   messageId: string
@@ -19,7 +19,7 @@ export function startOf(node: any): number { return node?.position?.start?.offse
 export function endOf(node: any): number { return node?.position?.end?.offset ?? -1 }
 
 const TYPE_CODE: Record<string, string> = {
-  heading: 'h', paragraph: 'p', 'list-item': 'li', blockquote: 'quote', table: 'table', code: 'code',
+  heading: 'h', paragraph: 'p', 'list-item': 'li', blockquote: 'quote', table: 'table', code: 'code', math: 'math',
 }
 export function blockTypeOf(node: any): BlockType | undefined {
   if (node.type === 'heading') return 'heading'
@@ -28,6 +28,7 @@ export function blockTypeOf(node: any): BlockType | undefined {
   if (node.type === 'blockquote') return 'blockquote'
   if (node.type === 'table') return 'table'
   if (node.type === 'code') return 'code'
+  if (node.type === 'math') return 'math'
   return undefined
 }
 
@@ -83,6 +84,8 @@ export function buildBlockModels(root: Root, messageId: string): BlockModel[] {
         const cells: { row: number; col: number; canonicalText: string }[] = []
         rowsNodes.forEach((row, r) => row.children.forEach((cell, c) => cells.push({ row: r, col: c, canonicalText: flattenText(cell) })))
         out.push({ id: blockIdOf(messageId, t, startOf(node), endOf(node)), messageId, type: t, sourceStart: startOf(node), sourceEnd: endOf(node), canonicalText: canonicalOf(node), annotatable: true, headingPath: headingPath.filter(Boolean).slice(), table: { id: tableIdOf(messageId, startOf(node), endOf(node)), rows, cols, cells } })
+      } else if (t === 'math') {
+        out.push({ id: blockIdOf(messageId, t, startOf(node), endOf(node)), messageId, type: t, sourceStart: startOf(node), sourceEnd: endOf(node), canonicalText: (node as any).value || '', annotatable: false, headingPath: headingPath.filter(Boolean).slice() })
       } else if (t === 'code') {
         out.push({ id: blockIdOf(messageId, t, startOf(node), endOf(node)), messageId, type: t, sourceStart: startOf(node), sourceEnd: endOf(node), canonicalText: (node as any).value || '', annotatable: false, headingPath: headingPath.filter(Boolean).slice() })
       } else {

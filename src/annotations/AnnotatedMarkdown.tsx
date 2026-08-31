@@ -14,7 +14,7 @@ import css from './annotate.module.css'
 export function AnnotatedMarkdown({ content, messageId, conversationId }: { content: string; messageId: string; conversationId: string }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [pending, setPending] = useState<SelectionMapping | null>(null)
-  const [pendingBox, setPendingBox] = useState<{ left: number; top: number } | null>(null)
+  const [pendingBox, setPendingBox] = useState<{ left: number; top: number } | null>(null) // retained but not used for a near-selection popup; action is a fixed bottom bar
   const annotations = useMessageAnnotations(conversationId, messageId)
   const { blocks, canonicalOf } = useMemo(() => buildBlockMap(content, messageId), [content, messageId])
   const hasHl = highlightSupported()
@@ -70,11 +70,11 @@ export function AnnotatedMarkdown({ content, messageId, conversationId }: { cont
   return (
     <div ref={wrapRef} className={css.wrap} data-highlight={hasHl}>
       <MarkdownBlocks content={content} messageId={messageId} annotations={annotations} onTableAction={onTableAction} />
-      {pending && pending.kind === 'text' && pendingBox && (
-        <button className={css.annotBtn} style={{ left: pendingBox.left, top: pendingBox.top }} onClick={doToggle}>{fullyCovered ? '取消标记' : '标记'}</button>
+      {pending && pending.kind === 'text' && (
+        <div className={css.annotBar}><button className={css.annotBtn} onClick={doToggle}>{fullyCovered ? '取消标记' : '标记'}</button></div>
       )}
-      {pending && pending.kind === 'table-cross-cell' && pendingBox && (
-        <button className={css.annotBtn} style={{ left: pendingBox.left, top: pendingBox.top }} onClick={markCrossCell}>{hasExactRectangle(annotations, pending.tableId, normalizeBounds(pending.startCell.row, pending.startCell.column, pending.endCell.row, pending.endCell.column)) ? '取消标记' : '标记'}</button>
+      {pending && pending.kind === 'table-cross-cell' && (
+        <div className={css.annotBar}><button className={css.annotBtn} onClick={markCrossCell}>{hasExactRectangle(annotations, pending.tableId, normalizeBounds(pending.startCell.row, pending.startCell.column, pending.endCell.row, pending.endCell.column)) ? '取消标记' : '标记'}</button></div>
       )}
     </div>
   )

@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { type Conversation, type Message, type Attachment, newStableId, NEW_TITLE } from './types'
 import { getSetting, setSetting, saveConversation, deleteConversation, listConversations } from '../storage/storage'
 import { getSettingsSnapshot } from './settings-store'
-import { streamTextChat, DeepSeekError, errorKindLabel, buildApiMessages, isVisionModel } from '../api/deepseek'
+import { streamTextChat, DeepSeekError, errorKindLabel, buildApiMessages, buildRequestMessages, isVisionModel } from '../api/deepseek'
 import { toDataUrl, deleteAttachment, attachmentErrorLabel } from './attachment-service'
 import { deleteConvAnnotations } from '../annotations/annotation-service'
 
@@ -32,8 +32,10 @@ export function getSessionsStatus(): RequestStatus { return state.status }
 function index(list: Conversation[]): Record<string, Conversation> {
   const m: Record<string, Conversation> = {}; for (const c of list) m[c.id] = c; return m
 }
+function sortList(list: Conversation[]): Conversation[] { return [...list].sort((a, b) => b.updatedAt - a.updatedAt) }
 function toState(list: Conversation[], current?: string, ready = state.ready, status = state.status, sendError = state.sendError): SessionsState {
-  return { list, byId: index(list), current: current ?? list[0]?.id, ready, status, sendError }
+  const sorted = sortList(list)
+  return { list: sorted, byId: index(sorted), current: current ?? sorted[0]?.id, ready, status, sendError }
 }
 function upsertState(conv: Conversation, extra?: Partial<SessionsState>) {
   setState({ ...toState(state.list.map(c => c.id === conv.id ? conv : c), state.current), ...(extra || {}) })
@@ -50,6 +52,7 @@ export const sessionsActions = {
     return c.id
   },
   async open(id: string) {
+    if (state.status === 'sending' || state.status === 'streaming') return // freeze: don't switch while generating
     setState(toState(state.list, id, state.ready, state.status, state.sendError))
     await setSetting(LAST_CONV, id)
   },
@@ -91,7 +94,8 @@ export const sessionsActions = {
       const hasImages = afterUser.messages.some(x => x.images.length > 0)
       if (hasImages && !isVisionModel(settings.model)) { setState({ ...state, status: 'error', sendError: attachmentErrorLabel('vision-unsupported') }); abortControllerRef = null; return }
       const apiMessages = await buildApiMessages(afterUser.messages, toDataUrl)
-      const r = await streamTextChat({ apiKey: settings.apiKey, baseUrl: settings.apiBaseUrl, model: settings.model, messages: apiMessages, signal: controller.signal, onDelta })
+      const reqMessages = buildRequestMessages(apiMessages, settings)
+      const r = await streamTextChat({ apiKey: settings.apiKey, baseUrl: settings.apiBaseUrl, model: settings.model, messages: reqMessages, signal: controller.signal, onDelta })
       received = r.content
       commit()
       const finalConv = state.byId[id]
