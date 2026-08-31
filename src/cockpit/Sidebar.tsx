@@ -3,6 +3,7 @@ import { useSessions, sessionsActions, type ChatSession } from '../engine/sessio
 import { t } from '../engine/locale'
 import { uiActions } from '../engine/ui-store'
 import { galleryActions } from '../gallery/gallery-store'
+import { layoutStore, useLayoutStore } from '../engine/layout-store'
 import { NEW_TITLE } from '../engine/types'
 import { Button, IconNewChatOutline16, IconSearchOutline16, IconSettingsOutline16, Input } from '../dsh/primitives'
 import css from './cockpit.module.css'
@@ -33,9 +34,14 @@ export function Sidebar({ collapsed, width }: { collapsed: boolean; width: numbe
   const { fs, toggle } = useFullscreen()
   const filtered = q ? sessions.filter(s => s.title.toLowerCase().includes(q.toLowerCase())) : sessions
   const fsTitle = fs ? '退出全屏' : '全屏'
+  const narrow = useLayoutStore(s => s.narrow)
+  const openHistory = () => { if (narrow) layoutStore.actions.openNarrowSidebar(); else layoutStore.actions.toggleSidebar() }
+  const collapseSidebar = () => { if (narrow) layoutStore.actions.closeNarrowSidebar(); else layoutStore.actions.toggleSidebar() }
   if (collapsed) {
     return <div className={css.sideRail} style={{ width }}>
       <Button aria-label="新建会话" title="新建会话" icon={<IconNewChatOutline16 />} onClick={() => sessionsActions.newChat()} />
+      <Button aria-label="历史" title="历史会话" onClick={openHistory}><span className={css.railText}>历</span></Button>
+      <Button aria-label="资料" title="资料" onClick={() => galleryActions.open(currentConv?.id, 0)}><span className={css.railText}>图</span></Button>
       <Button aria-label="全屏" title={fsTitle} onClick={toggle}><span className={css.railText}>全</span></Button>
       <Button aria-label="设置" title="设置" icon={<IconSettingsOutline16 />} onClick={uiActions.openSettings} />
     </div>
@@ -45,7 +51,8 @@ export function Sidebar({ collapsed, width }: { collapsed: boolean; width: numbe
       <div className={css.sidebarHead}>
         <div className={css.sidebarTitle}>会话</div>
         <div className={css.sidebarHeadBtns}>
-          <Button onClick={() => galleryActions.open(currentConv?.id, 0)}>资料</Button>
+          <Button title="收起侧栏" onClick={collapseSidebar}><span aria-hidden className={css.railText}>‹ 收起</span></Button>
+          <Button size="sm" title="资料" onClick={() => galleryActions.open(currentConv?.id, 0)}>资料</Button>
           <Button icon={<IconSettingsOutline16 />} onClick={uiActions.openSettings} />
           <Button onClick={toggle}>{fsTitle}</Button>
           <Button icon={<IconNewChatOutline16 />} onClick={() => sessionsActions.newChat()}>{t('sidebar.newChat')}</Button>
@@ -53,17 +60,17 @@ export function Sidebar({ collapsed, width }: { collapsed: boolean; width: numbe
       </div>
       <div className={css.sidebarSearch}><Input icon={<IconSearchOutline16 />} value={q} onChange={e => setQ(e.target.value)} placeholder={t('sidebar.search')} /></div>
       <div className={css.sidebarList}>
-        {filtered.map(s => <SessionRow key={s.id} session={s} active={s.id === current} busy={busy} />)}
+        {filtered.map(s => <SessionRow key={s.id} session={s} active={s.id === current} busy={busy} narrow={narrow} />)}
         {filtered.length === 0 && <div className={css.sidebarEmpty}>暂无会话</div>}
       </div>
     </div>
   )
 }
 
-function SessionRow({ session, active, busy }: { session: ChatSession; active: boolean; busy: boolean }) {
+function SessionRow({ session, active, busy, narrow }: { session: ChatSession; active: boolean; busy: boolean; narrow: boolean }) {
   const [confirming, setConfirming] = useState(false)
   const doDelete = () => { if (confirming) { sessionsActions.remove(session.id); setConfirming(false) } else setConfirming(true) }
-  const onOpen = () => { if (busy) { window.alert('正在生成，请先停止生成'); return } sessionsActions.open(session.id) }
+  const onOpen = () => { if (busy) { window.alert('正在生成，请先停止生成'); return } sessionsActions.open(session.id); if (narrow) layoutStore.actions.closeNarrowSidebar() }
   return (
     <div className={css.sessionRowWrap + (active ? ' ' + css.sessionRowWrapActive : '')}>
       <button className={css.sessionRow} onClick={onOpen}>
