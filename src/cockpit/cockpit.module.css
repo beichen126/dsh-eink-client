@@ -81,3 +81,9 @@
 .promptLabel { font-size: 13px; color: var(--dsw-alias-label-secondary); }
 .promptArea { margin-top: 8px; width: 100%; min-height: 70px; resize: vertical; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); padding: 8px 10px; font-size: 13px; line-height: 20px; font-family: inherit; }
 .promptArea:focus { outline: none; border-color: var(--dsw-alias-brand-primary); }
+/* Data & export */
+.exportSection { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--dsw-alias-border-l2); }
+.exportTitle { font-size: 14px; font-weight: 600; color: var(--dsw-alias-label-primary); margin-bottom: 8px; }
+.exportRow { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.importBtn { display: inline-flex; align-items: center; padding: 6px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; color: var(--dsw-alias-label-secondary); font-size: 13px; cursor: pointer; }
+.importBtn:hover { background: var(--dsw-alias-interactive-bg-hover); }

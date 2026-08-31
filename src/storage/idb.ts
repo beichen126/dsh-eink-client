@@ -43,3 +43,19 @@ export async function idbDeleteByIndex(store, index, key) {
 export async function idbBatchPut(store, values) { const db = await openDb(); const os = tx(db, store, 'readwrite'); for (const v of values) await asPromise(os.put(v)) }
 export async function idbBatchDelete(store, keys) { const db = await openDb(); const os = tx(db, store, 'readwrite'); for (const k of keys) await asPromise(os.delete(k)) }
 export async function closeDb() { if (dbPromise) { const db = await dbPromise; db.close(); dbPromise = null } }
+export async function idbReplaceAll(records: { settings: any[]; conversations: any[]; attachments: any[]; annotations: any[] }): Promise<void> {
+  const db = await openDb()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(['settings', 'conversations', 'attachments', 'annotations'], 'readwrite')
+    const stores = ['settings', 'conversations', 'attachments', 'annotations'] as const
+    for (const s of stores) tx.objectStore(s).clear()
+    const put = (store: string, vals: any[]) => { const os = tx.objectStore(store); for (const v of vals) os.put(v) }
+    put('settings', records.settings)
+    put('conversations', records.conversations)
+    put('attachments', records.attachments)
+    put('annotations', records.annotations)
+    tx.oncomplete = () => resolve(undefined)
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
+  })
+}

@@ -20,6 +20,7 @@ export async function toggleMessageSelection(conversationId: string, messageId: 
 }
 export function setMessageAnnotations(conversationId: string, messageId: string, anns: Annotation[]): void { cache.set(key(conversationId, messageId), anns); notify() }
 export function dropMessageAnnotations(conversationId: string, messageId: string): void { cache.delete(key(conversationId, messageId)); notify() }
+export function clearAnnotationCache(): void { cache.clear(); notify() }
 export { deleteConvAnnotations }
 export async function toggleTableCellsMessage(conversationId: string, messageId: string, tableId: string, bounds: TableBounds): Promise<void> {
   cache.set(key(conversationId, messageId), await toggleTableCellsAnnotation(conversationId, messageId, tableId, bounds)); notify()
