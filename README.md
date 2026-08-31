@@ -14,7 +14,7 @@
 
 ## 与全局 DSH 的关系
 
-1. 全局安装的 `@deepseek-ai/dsh`（`C:\Users\lenovo\AppData\Roaming\npm\node_modules\@deepseek-ai\dsh`）**保持完全只读**，任何情况下不修改。
+1. 全局安装的 `@deepseek-ai/dsh`（全局 `@deepseek-ai/dsh` 安装目录）**保持完全只读**，任何情况下不修改。
 2. 全局 DSH 基线见 `DSH_BASELINE.json`（每个文件的 SHA256 + 长度 + mtime）。关键阶段后重算比对，任何变化视为失败。
 3. `vendor/dsh` 仅为上游源码参考与迁移来源，**不是最终工程的运行时或构建依赖**。临时移走 `vendor/dsh` 后，`npm install` + `npm run build` 仍须独立成功。
 
