@@ -17,7 +17,9 @@
     "test:attachments": "npx tsx scripts/test-attachments.ts",
     "test:block": "npx tsx scripts/test-block-layer.ts",
     "test:table": "npx tsx scripts/test-table-ops.ts",
-    "test:export": "npx tsx scripts/test-export.ts"
+    "test:export": "npx tsx scripts/test-export.ts",
+    "test:math": "npx tsx scripts/test-math.ts",
+    "test:math-export": "npx tsx scripts/test-math-export.ts"
   },
   "dependencies": {
     "@types/mdast": "^4.0.4",

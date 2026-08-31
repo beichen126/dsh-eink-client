@@ -127,6 +127,17 @@ export function toggleWholeTable(conversationId: string, messageId: string, tabl
   return { remove: [], keep: [...existing, newAnn], add: [newAnn] }
 }
 
+/** whole-formula toggle: at most one per mathId; add or remove. */
+export function toggleMath(conversationId: string, messageId: string, mathId: string, mathKind: 'inline' | 'block', existing: Annotation[]): { remove: Annotation[]; keep: Annotation[]; add: Annotation[] } {
+  const ext = existing.find((a) => a.target.type === 'math' && a.target.mathId === mathId)
+  if (ext) return { remove: [ext], keep: existing.filter((a) => a.id !== ext.id), add: [] }
+  const now = Date.now()
+  const newAnn: Annotation = { id: newStableId(), conversationId, messageId, target: { type: 'math', mathId, mathKind }, createdAt: now, updatedAt: now, version: 1 }
+  return { remove: [], keep: [...existing, newAnn], add: [newAnn] }
+}
+/** Whether a whole-formula annotation exists for a mathId. */
+export function hasMath(existing: Annotation[], mathId: string): boolean { return existing.some((a) => a.target.type === 'math' && a.target.mathId === mathId) }
+
 /** Whether a whole-table annotation exists for a given table. */
 export function hasWholeTable(existing: Annotation[], tableId: string): boolean { return existing.some((a) => a.target.type === 'table' && a.target.tableId === tableId) }
 /** Whether a rectangle annotation equals the given bounds. */

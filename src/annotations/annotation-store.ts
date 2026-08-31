@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { loadMessageAnnotations, toggleTextSelection, toggleTableCellsAnnotation, toggleWholeTableAnnotation } from './annotation-service'
+import { loadMessageAnnotations, toggleTextSelection, toggleTableCellsAnnotation, toggleWholeTableAnnotation, toggleMathAnnotation } from './annotation-service'
 import type { Annotation } from './annotation-types'
 import type { TextAnchor } from './annotation-types'
 import type { TextSelectionSegment } from './selection-types'
@@ -27,4 +27,7 @@ export async function toggleTableCellsMessage(conversationId: string, messageId:
 }
 export async function toggleWholeTableMessage(conversationId: string, messageId: string, tableId: string): Promise<void> {
   cache.set(key(conversationId, messageId), await toggleWholeTableAnnotation(conversationId, messageId, tableId)); notify()
+}
+export async function toggleMathMessage(conversationId: string, messageId: string, mathId: string, mathKind: 'inline' | 'block'): Promise<void> {
+  cache.set(key(conversationId, messageId), await toggleMathAnnotation(conversationId, messageId, mathId, mathKind)); notify()
 }

@@ -1,4 +1,4 @@
-import { buildBlockModels, tableIdOf, startOf, endOf, type BlockModel } from '../markdown/block-layer'
+import { buildBlockModels, tableIdOf, mathIdOf, mathKindOf, startOf, endOf, type BlockModel } from '../markdown/block-layer'
 import { parseMarkdown } from '../markdown/parse'
 import type { Conversation, Message } from '../engine/types'
 import type { Annotation } from '../annotations/annotation-types'
@@ -29,6 +29,17 @@ function indexTables(content: string, messageId: string): Map<string, any> {
 }
 
 function tableSource(content: string, node: any): string { const a = startOf(node), b = endOf(node); return content.slice(a, b) }
+const MARK_MATH_START = '<!-- marked-math:start -->'
+const MARK_MATH_END = '<!-- marked-math:end -->'
+function indexMath(content: string, messageId: string): Map<string, { node: any; kind: 'inline' | 'block' }> {
+  const root = parseMarkdown(content)
+  const out = new Map<string, { node: any; kind: 'inline' | 'block' }>()
+  const walk = (nodes: any[]): void => { for (const n of nodes) { if (n.type === 'inlineMath' || n.type === 'math') { const kind = mathKindOf(n); out.set(mathIdOf(messageId, kind, startOf(n), endOf(n)), { node: n, kind }) } if (n.children && Array.isArray(n.children)) walk(n.children) } }
+  walk((root.children as any) || [])
+  return out
+}
+function mathSource(content: string, node: any): string { return content.slice(startOf(node), endOf(node)) }
+function mathMarked(src: string, kind: 'inline' | 'block'): string { return kind === 'inline' ? MARK_MATH_START + src + MARK_MATH_END : MARK_MATH_START + '\n' + src + '\n' + MARK_MATH_END }
 const TABLE_START = '<!-- marked-table:start -->'
 const TABLE_END = '<!-- marked-table:end -->'
 
@@ -37,8 +48,10 @@ export function annotateMessageSource(content: string, messageId: string, anns: 
   const root = parseMarkdown(content)
   const blocks = indexBlocks(root, messageId)                 // blockId -> node
   const tables = indexTables(content, messageId)              // tableId -> node
+  const maths = indexMath(content, messageId)                 // mathId -> node
   const edits: Edit[] = []
   const markedTables = new Set<string>()
+  const markedMaths = new Set<string>()
 
   const markTable = (tableId: string): void => {
     if (markedTables.has(tableId)) return
@@ -67,6 +80,13 @@ export function annotateMessageSource(content: string, messageId: string, anns: 
       }
     } else if (t.type === 'table' || t.type === 'table-cells') {
       markTable(t.tableId)
+    } else if (t.type === 'math') {
+      if (markedMaths.has(t.mathId)) continue
+      const entry = maths.get(t.mathId); if (!entry) continue
+      markedMaths.add(t.mathId)
+      const s = startOf(entry.node), e = endOf(entry.node)
+      if (entry.kind === 'inline') { edits.push({ pos: s, text: MARK_MATH_START }); edits.push({ pos: e, text: MARK_MATH_END }) }
+      else { edits.push({ pos: s, text: MARK_MATH_START + '\n' }); edits.push({ pos: e, text: '\n' + MARK_MATH_END }) }
     }
   }
   return applyEdits(content, edits)
@@ -101,6 +121,7 @@ export function markedOnlyMarkdown(conv: Conversation, anns: Annotation[]): stri
     const models = buildBlockModels(root, m.id)
     const blocks = indexBlocks(root, m.id)
     const tables = indexTables(m.content, m.id)
+    const maths = indexMath(m.content, m.id)
     const items: Item[] = []
     const usedTables = new Set<string>()
     for (const a of list) {
@@ -120,6 +141,14 @@ export function markedOnlyMarkdown(conv: Conversation, anns: Annotation[]): stri
         const model = tableModelFor(models, t.tableId)
         const node = tables.get(t.tableId)
         if (node && !usedTables.has(t.tableId)) { usedTables.add(t.tableId); items.push({ role, context: model?.headingPath || [], md: TABLE_START + '\n' + tableSource(m.content, node) + '\n' + TABLE_END, blockStart: startOf(node), start: t.start }) }
+      } else if (t.type === 'math') {
+        const entry = maths.get(t.mathId)
+        if (entry) {
+          const pos = startOf(entry.node)
+          const model = models.find((x) => x.sourceStart <= pos && pos < x.sourceEnd)
+          const src = mathSource(m.content, entry.node)
+          items.push({ role, context: model?.headingPath || [], md: mathMarked(src, entry.kind), blockStart: pos, start: 0 })
+        }
       }
     }
     if (items.length === 0) continue

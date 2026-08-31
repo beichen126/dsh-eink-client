@@ -25,3 +25,5 @@
 .mathBlock { margin: 12px 0; display: flex; justify-content: center; overflow-x: auto; overflow-y: hidden; max-width: 100%; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); }
 .mathBlock .katex-display { margin: 0; }
 .mathInline { color: var(--dsw-alias-label-primary); }
+.studyMathHighlighted { background: #d9d9d9; }
+.studyMathHighlighted .katex, .studyMathHighlighted.katex { background-color: #d9d9d9; }

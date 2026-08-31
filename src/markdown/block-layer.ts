@@ -39,6 +39,10 @@ export function blockIdOf(messageId: string, type: BlockType, start: number, end
 export function tableIdOf(messageId: string, start: number, end: number): string {
   return messageId + '/table-' + start + '-' + end
 }
+export function mathKindOf(node: any): 'inline' | 'block' { return node.type === 'inlineMath' ? 'inline' : 'block' }
+export function mathIdOf(messageId: string, kind: 'inline' | 'block', start: number, end: number): string {
+  return messageId + '/math-' + kind + '-' + start + '-' + end
+}
 
 /** Flatten an mdast inline/block subtree to its continuous plain text (inline markup excluded). */
 export function flattenText(node: any): string {

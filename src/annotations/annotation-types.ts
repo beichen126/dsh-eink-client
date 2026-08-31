@@ -15,7 +15,8 @@ export type TextAnnotationTarget = {
   end: number
   quote: { exact: string; prefix: string; suffix: string }
 }
-export type AnnotationTarget = TextAnnotationTarget | TableCellsAnnotationTarget | TableAnnotationTarget
+export type MathAnnotationTarget = { type: 'math'; mathId: string; mathKind: 'inline' | 'block' }
+export type AnnotationTarget = TextAnnotationTarget | TableCellsAnnotationTarget | TableAnnotationTarget | MathAnnotationTarget
 export type Annotation = {
   id: StableId
   conversationId: StableId
