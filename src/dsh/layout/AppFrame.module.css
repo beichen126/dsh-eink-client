@@ -3,6 +3,10 @@
   display: grid;
   grid-template-rows: 100%;
   height: 100%;
+  box-sizing: border-box;
+  /* Lift the shell above the on-screen keyboard: the composer sets
+     --dsw-keyboard-inset on focus (measured once, no polling) and clears it on blur. */
+  padding-bottom: var(--dsw-keyboard-inset, 0px);
   overflow: hidden;
   background: var(--dsw-alias-bg-base);
   /* Collapse/expand animates the tracks on the deepsuite sider curve

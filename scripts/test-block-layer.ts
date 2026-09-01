@@ -58,5 +58,13 @@ assert(flattenText(paraNode) === '平均存储器访问时间，见链接与斜�
 const blocks2 = buildBlockModels(parseMarkdown(md), mid)
 assert(blocks.map(b=>b.id).join('|') === blocks2.map(b=>b.id).join('|'), 'blockIds stable across re-parse')
 
+// CJK-adjacent bold (DSH cjkFriendlyStrong): bold closes after punctuation when CJK prose continues.
+const cjkRoot = parseMarkdown('**平均存储器访问时间（AMAT）**值')
+let cjkStrong = false
+;(function w(ns: any[]){ for (const n of ns) { if (n.type === 'strong') cjkStrong = true; if (n.children) w(n.children) } })((cjkRoot.children as any))
+assert(cjkStrong, 'bold adjacent to CJK after punctuation (**（AMAT）**值) renders a strong node')
+const cjkText = flattenText((cjkRoot.children as any).find((c: any) => c.type === 'paragraph'))
+assert(!cjkText.includes('**'), 'no literal ** remains in the CJK-adjacent bold paragraph')
+
 console.log('\nRESULT pass='+pass+' fail='+fail)
 process.exit(fail===0?0:1)

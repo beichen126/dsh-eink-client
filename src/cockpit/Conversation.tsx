@@ -138,6 +138,14 @@ function Composer({ sessionId, busy }: { sessionId: string | undefined; busy: bo
     }
   }
   const removePic = (id: string) => { setPicIds(ps => ps.filter(x => x !== id)); void deleteAttachment(id) }
+  // Focus drives an immediate jump above the on-screen keyboard (measured once, no polling).
+  const onFocusJump = (e: any) => {
+    try { e.currentTarget.scrollIntoView({ block: 'nearest', behavior: 'auto' }) } catch {}
+    const vv = window.visualViewport
+    const inset = vv ? Math.max(0, window.innerHeight - vv.height) : 0
+    if (inset > 0) document.documentElement.style.setProperty('--dsw-keyboard-inset', inset + 'px')
+  }
+  const onBlurReset = () => { document.documentElement.style.setProperty('--dsw-keyboard-inset', '0px') }
   const send = () => {
     if (!sessionId || busy) return
     if (!text.trim() && picIds.length === 0) return
@@ -158,7 +166,7 @@ function Composer({ sessionId, busy }: { sessionId: string | undefined; busy: bo
           <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" multiple hidden onChange={e => { if (e.target.files && e.target.files.length) onFiles(e.target.files); e.target.value = '' }} />
           <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M8 1a2.5 2.5 0 0 1 2.5 2.5v4a2.5 2.5 0 0 1-5 0v-4A2.5 2.5 0 0 1 8 1zM3 8a5 5 0 0 0 10 0h-1.6a3.4 3.4 0 0 1-6.8 0H3z"/></svg>
         </label>
-        <textarea className={css.composerText} value={text} placeholder={t('composer.placeholder')}
+        <textarea className={css.composerText} value={text} placeholder={t('composer.placeholder')} onFocus={onFocusJump} onBlur={onBlurReset}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} />
         <button className={css.sendBtn} onClick={send} disabled={busy}>{busy ? '生成中' : '发送'}</button>
