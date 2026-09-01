@@ -37,6 +37,20 @@ export async function idbDelete(store: string, key: any): Promise<void> { const 
 export async function idbGetAllByIndex(store: string, index: string, key: any): Promise<any> {
   const db = await openDb(); const os = tx(db, store, 'readonly'); return asPromise(os.index(index).getAll(key))
 }
+/** Walk every row of a store with a cursor (one row in flight, never the whole store in
+ * memory). Used by the read-only storage diagnostics scan. */
+export async function idbScan(store: string, onRow: (row: any) => void): Promise<void> {
+  const db = await openDb(); const os = tx(db, store, 'readonly')
+  await new Promise<void>((resolve, reject) => {
+    const req = os.openCursor()
+    req.onsuccess = () => {
+      const cur = req.result
+      if (cur) { try { onRow(cur.value) } catch { /* never fail diagnostics on a bad row */ } cur.continue() }
+      else resolve(undefined)
+    }
+    req.onerror = () => reject(req.error)
+  })
+}
 export async function idbDeleteByIndex(store: string, index: string, key: any): Promise<void> {
   const db = await openDb(); const os = tx(db, store, 'readwrite')
   const keys = await asPromise(os.index(index).getAllKeys(key))

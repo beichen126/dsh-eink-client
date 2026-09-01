@@ -94,6 +94,16 @@
 /* Data & export */
 .exportSection { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--dsw-alias-border-l2); }
 .exportTitle { font-size: 14px; font-weight: 600; color: var(--dsw-alias-label-primary); margin-bottom: 8px; }
+/* Local storage diagnostics (read-only) */
+.storageSection { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--dsw-alias-border-l2); }
+.storageRows { display: flex; flex-direction: column; }
+.storageRow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 13px; color: var(--dsw-alias-label-secondary); }
+.storageLabel { color: var(--dsw-alias-label-tertiary); }
+.storageValue { color: var(--dsw-alias-label-primary); font-variant-numeric: tabular-nums; text-align: right; }
+.storageHint { font-size: 12px; color: var(--dsw-alias-label-tertiary); }
+.storageRefresh { margin-top: 8px; align-self: flex-end; border: 1px solid var(--dsw-alias-border-l2); background: transparent; color: var(--dsw-alias-label-primary); border-radius: 8px; padding: 4px 12px; cursor: pointer; font-size: 12px; }
+.storageRefresh:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.storageRefresh:disabled { opacity: .6; cursor: default; }
 .exportRow { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .importBtn { display: inline-flex; align-items: center; padding: 6px 12px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; color: var(--dsw-alias-label-secondary); font-size: 13px; cursor: pointer; }
 .importBtn:hover { background: var(--dsw-alias-interactive-bg-hover); }

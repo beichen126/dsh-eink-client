@@ -1,11 +1,12 @@
 
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useSettings, saveSettings, DEFAULT_SETTINGS } from '../engine/settings-store'
 import { testConnection } from '../api/deepseek'
 import { uiActions } from '../engine/ui-store'
 import { useSessions } from '../engine/sessions-store'
 import { exportBackupJson, exportConversationMd, exportMarkedOnlyMd, importBackupText, BackupError } from '../export'
 import { Modal, Button, Input } from '../dsh/primitives'
+import { getStorageDiagnostics, formatBytes, type StorageDiagnostics } from '../storage/diagnostics'
 import css from './cockpit.module.css'
 
 export function SettingsDialog() {
@@ -21,6 +22,17 @@ export function SettingsDialog() {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const currentConv = useSessions(x => x.byId[x.current || ''])
+
+  // Read-only local storage diagnostics: auto-loaded once when the dialog opens,
+  // refreshed manually. It never mutates anything and fails isolated from the rest.
+  const [storage, setStorage] = useState<StorageDiagnostics | null>(null)
+  const [storageState, setStorageState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const loadStorage = useCallback(async () => {
+    setStorageState('loading')
+    try { const d = await getStorageDiagnostics(); setStorage(d); setStorageState('ready') }
+    catch (e) { console.error('存储诊断失败', e); setStorageState('error') }
+  }, [])
+  useEffect(() => { void loadStorage() }, [loadStorage])
 
   const onSave = async () => { await saveSettings({ apiBaseUrl: base.trim(), apiKey: key.trim(), model: model.trim(), customSystemPrompt: prompt, customSystemPromptEnabled: promptOn }); setSaved(true); setTimeout(() => setSaved(false), 1500) }
   const onTest = async () => {
@@ -68,6 +80,23 @@ export function SettingsDialog() {
         </div>
         <div className={css.settingsHint}>完整备份不含 API Key。导入将替换当前本地会话、图片和标注。</div>
         {msg && <div className={css.testResult} data-ok="false">{msg}</div>}
+      </div>
+      <div className={css.storageSection}>
+        <div className={css.exportTitle}>本地存储</div>
+        {storageState === 'loading' && <div className={css.storageHint}>正在统计……</div>}
+        {storageState === 'error' && <div className={css.storageHint}>本地存储信息暂时无法读取</div>}
+        {storageState === 'ready' && storage && (
+          <div className={css.storageRows}>
+            <div className={css.storageRow}><span className={css.storageLabel}>本站总占用</span><span className={css.storageValue}>{storage.originUsageBytes !== undefined ? formatBytes(storage.originUsageBytes) : '浏览器未提供'}</span></div>
+            <div className={css.storageRow}><span className={css.storageLabel}>图片附件</span><span className={css.storageValue}>{storage.attachmentCount} 张</span></div>
+            <div className={css.storageRow}><span className={css.storageLabel}>图片附件占用</span><span className={css.storageValue}>{formatBytes(storage.attachmentBytes)}</span></div>
+            <div className={css.storageRow}><span className={css.storageLabel}>浏览器存储配额</span><span className={css.storageValue}>{storage.originQuotaBytes !== undefined ? formatBytes(storage.originQuotaBytes) : '浏览器未提供'}</span></div>
+          </div>
+        )}
+        <div className={css.storageHint}>仅用于查看本地空间占用，不清理、不删除任何数据。</div>
+        <div className={css.settingsActions}>
+          <Button variant="outline" disabled={storageState === 'loading'} onClick={() => void loadStorage()}>刷新</Button>
+        </div>
       </div>
     </Modal>
   )
