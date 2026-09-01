@@ -6,6 +6,7 @@ import { getConversation, getAnnotationsByConversation } from '../storage/storag
 import { initStore } from '../engine/sessions-store'
 import { initSettings } from '../engine/settings-store'
 import { clearAnnotationCache } from '../annotations/annotation-store'
+import { resetDrafts } from '../engine/draft-store'
 
 export { BackupError }
 export type { BackupV1, BackupAttachment } from './backup-types'
@@ -32,6 +33,9 @@ export async function importBackupText(text: string): Promise<void> {
   try { json = JSON.parse(text) } catch { throw new BackupError('JSON 解析失败') }
   const backup = parseAndValidate(json)
   await restoreBackup(backup)
+  // A restore replaces all local data (including draft:<id> settings rows), so drop
+  // the in-memory draft cache before initStore reloads from the restored settings.
+  resetDrafts()
   await initSettings()
   await initStore()
   clearAnnotationCache()

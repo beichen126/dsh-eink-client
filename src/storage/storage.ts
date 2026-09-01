@@ -4,6 +4,7 @@ import type { Annotation } from '../annotations/annotation-types'
 
 export async function getSetting(key) { const row = await idbGet('settings', key); return row ? row.value : undefined }
 export async function setSetting(key, value) { await idbPut('settings', { key, value }) }
+export async function deleteSetting(key) { await idbDelete('settings', key) }
 export async function getConversation(id) { return idbGet('conversations', id) }
 export async function listConversations() { const all = await idbGetAll('conversations'); return all.sort((a, b) => b.updatedAt - a.updatedAt) }
 export async function saveConversation(conv) { await idbPut('conversations', conv) }

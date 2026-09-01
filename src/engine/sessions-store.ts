@@ -6,7 +6,7 @@ import { getSettingsSnapshot } from './settings-store'
 import { streamTextChat, DeepSeekError, errorKindLabel, buildApiMessages, buildContextMessages, buildRequestMessages, countImageParts, isVisionModel } from '../api/deepseek'
 import { toDataUrl, deleteAttachment, attachmentErrorLabel, AttachmentError } from './attachment-service'
 import { deleteConvAnnotations } from '../annotations/annotation-service'
-import { getDraft, deleteDraft } from './draft-store'
+import { getDraft, deleteDraft, initDrafts } from './draft-store'
 
 export type { Conversation as ChatSession, Message as ChatMsg, Attachment as ChatImage }
 export const uid = (_p?: string) => newStableId()
@@ -115,7 +115,7 @@ export const sessionsActions = {
     if (conv) for (const m of conv.messages) for (const img of m.images) referenced.add(img)
     const draft = getDraft(id)
     for (const img of draft.imageIds) { if (!referenced.has(img)) { try { await deleteAttachment(img) } catch {} } }
-    deleteDraft(id)
+    await deleteDraft(id)
     // Persist the REAL current session (not the top-of-list one) so reloads reopen it.
     await setSetting(LAST_CONV, next.current ?? '')
   },
@@ -195,11 +195,13 @@ export async function initStore(): Promise<void> {
     c.messages = [{ id: newStableId(), role: 'assistant', content: "# 第五章 存储系统\n\n## 5.1 层次结构\n\n**平均存储器访问时间（AMAT）** = 命中时间 + 缺失率 × 缺失代价，可参考[存储层次](https://example.com)。\n\n- SRAM：快但贵\n- DRAM：主存主体\n- 磁盘：容量大\n\n> 局部性原理是缓存有效的前提。\n\n| 层次 | 容量 | 速度 |\n|---|---|---|\n| 寄存器 | 小 | 最快 |\n| Cache | 中 | 快 |\n\n```text\nAMAT = Hit + Miss_Rate × Miss_Penalty\n```", images: [], createdAt: now, updatedAt: now }]
     await saveConversation(c)
     await setSetting(LAST_CONV, c.id)
+    await initDrafts([c.id])
     setState(toState([c], c.id, true))
     return
   }
   const last = await getSetting(LAST_CONV)
   const lastOk = last && convs.some(c => c.id === last) ? last : convs[0].id
+  await initDrafts(convs.map(c => c.id))
   setState(toState(convs, lastOk, true))
   await setSetting(LAST_CONV, lastOk)
 }

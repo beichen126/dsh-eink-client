@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AppFrame } from './dsh/layout/AppFrame'
 import { useSessions, initStore } from './engine/sessions-store'
+import { flushAllDrafts } from './engine/draft-store'
 import { initSettings } from './engine/settings-store'
 import { useUi } from './engine/ui-store'
 import { layoutStore, useLayoutStore } from './engine/layout-store'
@@ -30,6 +31,15 @@ export function App() {
     catch (e) { console.error('本地数据载入失败', e); setBoot('error') }
   }, [])
   useEffect(() => { void bootFn() }, [bootFn])
+  // Best-effort flush of any pending debounced text draft when the page is hidden/unloaded,
+  // so quick navigation / system kill doesn't lose the last keystrokes.
+  useEffect(() => {
+    const flush = () => { void flushAllDrafts() }
+    const onVis = () => { if (document.visibilityState === 'hidden') void flushAllDrafts() }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVis)
+    return () => { window.removeEventListener('pagehide', flush); document.removeEventListener('visibilitychange', onVis) }
+  }, [])
   if (boot !== 'ready') {
     return (
       <div className="eink-boot">

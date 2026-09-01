@@ -160,7 +160,7 @@ function Composer({ sessionId, busy }: { sessionId: string | undefined; busy: bo
     const ok = await sessionsActions.sendUserMessage(sessionId, text.trim(), picIds)
     // Only clear the draft once the user message is ACCEPTED & persisted; the image ids
     // then belong to the message (ownership transfer), so we must NOT delete them here.
-    if (ok) { clearDraft(sessionId); setPhotoError(undefined); setOpenId(null) }
+    if (ok) { void clearDraft(sessionId); setPhotoError(undefined); setOpenId(null) }
   }
   return (
     <div className={css.composer}>
