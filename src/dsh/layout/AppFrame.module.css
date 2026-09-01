@@ -3,11 +3,6 @@
   display: grid;
   grid-template-rows: 100%;
   height: 100%;
-  box-sizing: border-box;
-  /* Rise above the on-screen keyboard (--dsw-keyboard-inset is set by a visualViewport
-     hook). With interactive-widget=resizes-content the inset is 0 and the layout viewport
-     itself shrinks; otherwise the shell is bottom-padded by the keyboard height. */
-  padding-bottom: var(--dsw-keyboard-inset, 0px);
   overflow: hidden;
   background: var(--dsw-alias-bg-base);
   /* Collapse/expand animates the tracks on the deepsuite sider curve

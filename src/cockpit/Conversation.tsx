@@ -50,15 +50,19 @@ export function Conversation() {
         </div>
       )}
       {sendError && !busy && <div className={css.errorBanner}>{sendError}</div>}
+      {/* Composer sits inside the scroll body, position:sticky bottom:0 (as in DSH), so the
+          mobile browser's native focus scroll lifts it above the on-screen keyboard. */}
       <div className={css.messages} ref={listRef} onScroll={onScroll}>
-        {!session || session.messages.length === 0 ? (
-          <div className={css.emptyHero}>
-            <div className={css.emptyTitle}>{t('conversation.emptyHero')}</div>
-            <div className={css.emptyHint}>{t('conversation.emptyHint')}</div>
-          </div>
-        ) : messages.map(m => <MessageRow key={m.id} m={m} streamingId={activeStreamingId} convId={session?.id} imgOffset={imageOffsetByMsg[m.id] || 0} />)}
+        <div className={css.messagesInner}>
+          {!session || session.messages.length === 0 ? (
+            <div className={css.emptyHero}>
+              <div className={css.emptyTitle}>{t('conversation.emptyHero')}</div>
+              <div className={css.emptyHint}>{t('conversation.emptyHint')}</div>
+            </div>
+          ) : messages.map(m => <MessageRow key={m.id} m={m} streamingId={activeStreamingId} convId={session?.id} imgOffset={imageOffsetByMsg[m.id] || 0} />)}
+        </div>
+        <Composer sessionId={session?.id} busy={busy} />
       </div>
-      <Composer sessionId={session?.id} busy={busy} />
     </div>
   )
 }

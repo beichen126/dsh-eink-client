@@ -19,49 +19,7 @@ function renderSlot(key: string, owner?: any): ReactNode {
   return null
 }
 
-function useKeyboardInset(): void {
-  useEffect(() => {
-    const root = document.documentElement
-    let focused = false
-    let lastInset = -1
-    let poll: ReturnType<typeof setInterval> | undefined
-    const measure = (): number => {
-      // Keyboard height among the ways a device may report it. Focus is the trigger;
-      // we poll while focused because many e-ink/embedded browsers shrink the visual
-      // viewport for the keyboard WITHOUT firing a resize event.
-      const vv = window.visualViewport
-      const vvH = vv ? vv.height : window.innerHeight
-      const vvInset = Math.max(0, window.innerHeight - vvH)
-      const docInset = Math.max(0, window.innerHeight - document.documentElement.clientHeight)
-      // docInset can be a ~15px scrollbar diff on desktop; only treat as a keyboard when meaningful.
-      return Math.max(vvInset, docInset > 24 ? docInset : 0)
-    }
-    const apply = (): void => {
-      const inset = focused ? measure() : 0
-      if (inset !== lastInset) { lastInset = inset; root.style.setProperty('--dsw-keyboard-inset', inset + 'px') }
-    }
-    const isEditable = (t: any): boolean => !!(t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || t.isContentEditable))
-    const startPoll = () => { if (!poll) poll = setInterval(apply, 120) }
-    const stopPoll = () => { if (poll) { clearInterval(poll); poll = undefined } }
-    const onFocusIn = (e: Event) => { if (isEditable(e.target)) { focused = true; apply(); startPoll() } }
-    const onFocusOut = (e: Event) => { if (isEditable(e.target)) { focused = false; apply(); stopPoll() } }
-    const onResize = () => { if (focused) apply() }
-    document.addEventListener('focusin', onFocusIn)
-    document.addEventListener('focusout', onFocusOut)
-    window.visualViewport?.addEventListener('resize', onResize)
-    window.addEventListener('orientationchange', onResize)
-    return () => {
-      document.removeEventListener('focusin', onFocusIn)
-      document.removeEventListener('focusout', onFocusOut)
-      window.visualViewport?.removeEventListener('resize', onResize)
-      window.removeEventListener('orientationchange', onResize)
-      stopPoll()
-    }
-  }, [])
-}
-
 export function App() {
-  useKeyboardInset()
   const ready = useSessions(s => s.ready)
   const settingsOpen = useUi(s => s.settingsOpen)
   useEffect(() => { void (async () => { await initSettings(); await initStore() })() }, [])
