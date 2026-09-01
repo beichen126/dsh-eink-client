@@ -5,6 +5,7 @@ export function buildBlockMap(content: string, messageId: string): { blocks: Map
   const models = buildBlockModels(parseMarkdown(content), messageId)
   const blocks = new Map(models.map((m) => [m.id, m]))
   const canonicalOf = (anchor: TextAnchor): string => {
+    if (!anchor || typeof anchor.scope !== 'string') return ''
     if (anchor.scope === 'block') { const b = blocks.get(anchor.blockId); return b ? b.canonicalText : '' }
     const b = Array.from(blocks.values()).find((x) => x.table && x.table.id === anchor.tableId)
     const cell = b && b.table ? b.table.cells.find((x) => x.row === anchor.row && x.col === anchor.column) : undefined

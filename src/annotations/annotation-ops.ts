@@ -4,6 +4,10 @@ import type { Annotation, TextAnnotationTarget } from './annotation-types'
 
 /** anchor key — annotations never merge across different blocks / table cells. */
 export function anchorKey(a: TextAnchor): string {
+  // Non-text annotations (math / table / table-cells targets) carry no .anchor.
+  // Never treat them as a text anchor: return a sentinel that can't match a real one,
+  // so text toggles exclude (and preserve) them instead of crashing on undefined.scope.
+  if (!a || typeof (a as any).scope !== 'string') return 'NONE'
   return a.scope === 'block' ? 'B:' + a.blockId : 'C:' + a.tableId + ':' + a.row + ':' + a.column
 }
 export function sameAnchor(a: TextAnchor, b: TextAnchor): boolean { return anchorKey(a) === anchorKey(b) }

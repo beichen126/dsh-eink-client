@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto'
 import { parseMarkdown } from '../src/markdown/parse.ts'
 import { buildBlockModels, mathIdOf, mathKindOf, startOf, endOf } from '../src/markdown/block-layer.ts'
 import { toggleMath } from '../src/annotations/annotation-ops.ts'
+import { toggleTextSelection } from '../src/annotations/annotation-service.ts'
 import { buildBackup } from '../src/export/backup-export.ts'
 import { parseAndValidate, restoreBackup } from '../src/export/backup-import.ts'
 import { saveAnnotation, getAnnotationsByMessage, saveConversation } from '../src/storage/storage.ts'
@@ -64,6 +65,16 @@ await idbReplaceAll({settings:[],conversations:[],attachments:[],annotations:[]}
 await restoreBackup(parseAndValidate(JSON.parse(JSON.stringify(backup))))
 const after=await getAnnotationsByMessage('c-math','m1')
 assert(after.length===1&&after[0].target.type==='math'&&after[0].target.mathId===a[0].id,'import restores math annotation')
+
+console.log('=== text toggle with non-text annotation present (regression: no undefined.scope crash) ===')
+const mAnn0: Annotation = { id:'ann-mm', conversationId:'c1', messageId:'m1', target:{ type:'math', mathId:'c1/math-inline-3-11', mathKind:'inline' }, createdAt:1, updatedAt:1, version:1 }
+await saveAnnotation(mAnn0)
+const seg0 = { messageId:'m1', blockId:'some-block', start:0, end:2, exact:'AB', prefix:'', suffix:'' }
+let crash2=false, out: any[]=[]
+try { out = await toggleTextSelection('c1','m1',[seg0], (a)=>'AB') } catch(e){ crash2=true; console.log('  threw: '+e) }
+assert(!crash2, 'toggleTextSelection with existing math annotation does NOT crash')
+assert(out.some((a)=>a.target.type==='math'), 'math annotation preserved after text toggle')
+assert(out.some((a)=>a.target.type==='text'), 'text annotation added')
 
 console.log('\nRESULT pass='+pass+' fail='+fail)
 process.exit(fail===0?0:1)
