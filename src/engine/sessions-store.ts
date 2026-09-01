@@ -3,7 +3,7 @@ import { type Conversation, type Message, type Attachment, type StableId, newSta
 import { sanitizeTitle } from './session-title'
 import { getSetting, setSetting, saveConversation, deleteConversation, listConversations } from '../storage/storage'
 import { getSettingsSnapshot } from './settings-store'
-import { streamTextChat, DeepSeekError, errorKindLabel, buildApiMessages, buildRequestMessages, countImageParts, isVisionModel } from '../api/deepseek'
+import { streamTextChat, DeepSeekError, errorKindLabel, buildApiMessages, buildContextMessages, buildRequestMessages, countImageParts, isVisionModel } from '../api/deepseek'
 import { toDataUrl, deleteAttachment, attachmentErrorLabel, AttachmentError } from './attachment-service'
 import { deleteConvAnnotations } from '../annotations/annotation-service'
 
@@ -89,13 +89,17 @@ export const sessionsActions = {
     try {
       // --- LOCAL PREFLIGHT (no network, and NO assistant placeholder yet) ---
       // A preflight failure must not leave a ghost empty assistant message behind.
-      const hasImages = afterUser.messages.some(x => x.images.length > 0)
+      // Image-context policy (§17): text history is always retained, but only the most
+      // recent N image-bearing turns keep their images, so a growing conversation never
+      // re-encodes the whole historical image set on every request.
+      const contextMessages = buildContextMessages(afterUser.messages)
+      const hasImages = contextMessages.some(x => x.images.length > 0)
       if (hasImages && !isVisionModel(settings.model)) { setState({ ...state, status: 'error', sendError: attachmentErrorLabel('vision-unsupported') }); return }
-      const apiMessages = await buildApiMessages(afterUser.messages, toDataUrl)
+      const apiMessages = await buildApiMessages(contextMessages, toDataUrl)
       const reqMessages = buildRequestMessages(apiMessages, settings)
-      // Invariant (§16): the outgoing request must encode exactly the images the user
-      // attached. If not, block the fetch and tell the user — never silently drop one.
-      const expectedImages = afterUser.messages.reduce((sum, mm) => sum + mm.images.length, 0)
+      // Invariant (§16): the outgoing request must encode exactly the images the context
+      // policy retained. If not, block the fetch and tell the user — never silently drop.
+      const expectedImages = contextMessages.reduce((sum, mm) => sum + mm.images.length, 0)
       const encodedImages = countImageParts(reqMessages)
       if (encodedImages !== expectedImages) {
         setState({ ...state, status: 'error', sendError: '图片准备失败：已选择 ' + expectedImages + ' 张，实际仅准备成功 ' + encodedImages + ' 张。请检查附件后重试。' })

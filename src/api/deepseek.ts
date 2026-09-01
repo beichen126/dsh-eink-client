@@ -205,6 +205,33 @@ export function countImageParts(msgs: ApiChatMessage[]): number {
   for (const m of msgs) { if (Array.isArray(m.content)) for (const part of m.content) if (part.type === 'image_url') n++ }
   return n
 }
+/**
+ * Image-context policy: how many trailing image-bearing user turns keep their images
+ * for the NEXT request. Text history is always retained; earlier turns' images are
+ * cleared so a growing conversation never re-base64s the whole attachment history.
+ */
+export type ImageContextPolicy = { keepRecentImageTurns: number }
+export const DEFAULT_IMAGE_CONTEXT: ImageContextPolicy = { keepRecentImageTurns: 1 }
+
+/**
+ * Decide exactly which message images enter the next API request.
+ * - Text of every message is kept verbatim.
+ * - Only the most recent keepRecentImageTurns image-bearing user turns keep images;
+ *   every earlier image-bearing turn has its images emptied (not re-encoded).
+ * keepRecentImageTurns <= 0 forwards no images (text-only request).
+ */
+export function buildContextMessages(msgs: import('../engine/types').Message[], policy: ImageContextPolicy = DEFAULT_IMAGE_CONTEXT): import('../engine/types').Message[] {
+  const imageTurnIdx: number[] = []
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i]
+    if (m.role === 'user' && m.images.length > 0) imageTurnIdx.push(i)
+    if (imageTurnIdx.length >= Math.max(0, policy.keepRecentImageTurns)) break
+  }
+  const keep = new Set<number>(policy.keepRecentImageTurns > 0 ? imageTurnIdx : [])
+  return msgs.map((m, i) => (m.role === 'user' && m.images.length > 0 && !keep.has(i)) ? { ...m, images: [] } : m)
+}
+
+
 /** Prepend a fixed global system prompt if enabled+non-empty. Shared by text/vision/streaming paths. */
 export function buildRequestMessages(apiMessages: ApiChatMessage[], settings: { customSystemPrompt: string; customSystemPromptEnabled: boolean }): ApiChatMessage[] {
   if (settings.customSystemPromptEnabled && settings.customSystemPrompt.trim()) {
