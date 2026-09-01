@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MarkdownBlocks } from '../markdown/MarkdownBlocks'
 import { mapSelection } from './selection-mapper'
@@ -8,14 +7,12 @@ import { useMessageAnnotations, toggleMessageSelection, toggleTableCellsMessage,
 import { setMessageRanges, removeMessageRanges, highlightSupported } from './highlight-registry'
 import { shouldToggleAll, normalizeBounds, hasExactRectangle, hasWholeTable, hasMath } from './annotation-ops'
 import { containsNode, ownedMath } from './ownership'
-import type { SelectionMapping, TextSelectionSegment } from './selection-types'
-import type { TableBounds } from './annotation-types'
+import type { SelectionMapping } from './selection-types'
 import css from './annotate.module.css'
 
 export function AnnotatedMarkdown({ content, messageId, conversationId }: { content: string; messageId: string; conversationId: string }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [pending, setPending] = useState<SelectionMapping | null>(null)
-  const [pendingBox, setPendingBox] = useState<{ left: number; top: number } | null>(null)
   const annotations = useMessageAnnotations(conversationId, messageId)
   const { blocks, canonicalOf } = useMemo(() => buildBlockMap(content, messageId), [content, messageId])
   const hasHl = highlightSupported()
@@ -52,27 +49,27 @@ export function AnnotatedMarkdown({ content, messageId, conversationId }: { cont
       const sel = window.getSelection()
       // Math click: pointerup landed on a formula inside THIS message (guarded by
       // ownedMath in onPointerDown). Only the owning instance may enter pending-math.
-      if (pressedMath) { setPending({ kind: 'math', mathId: pressedMath.id, mathKind: pressedMath.kind }); setPendingBox(null); pressedMath = null; return }
-      if (!sel || sel.rangeCount === 0) { setPending(null); setPendingBox(null); return }
-      if (sel.isCollapsed) { setPending(null); setPendingBox(null); return }
+      if (pressedMath) { setPending({ kind: 'math', mathId: pressedMath.id, mathKind: pressedMath.kind }); pressedMath = null; return }
+      if (!sel || sel.rangeCount === 0) { setPending(null); return }
+      if (sel.isCollapsed) { setPending(null); return }
       const range = sel.getRangeAt(0)
       // Ownership: only respond to a selection ENTIRELY inside this message. A
       // selection or formula in another message must never drive this instance.
-      if (!containsNode(wrapRef.current, range.startContainer) || !containsNode(wrapRef.current, range.endContainer)) { setPending(null); setPendingBox(null); return }
+      if (!containsNode(wrapRef.current, range.startContainer) || !containsNode(wrapRef.current, range.endContainer)) { setPending(null); return }
       const msgEl = wrapRef.current?.querySelector('[data-message-id]')
-      if (!msgEl) { setPending(null); setPendingBox(null); return }
+      if (!msgEl) { setPending(null); return }
       try {
         const mStart = ownedMath(wrapRef.current, range.startContainer as any)
         const mEnd = ownedMath(wrapRef.current, range.endContainer as any)
-        if (mStart && mEnd && mStart.id === mEnd.id) { setPending({ kind: 'math', mathId: mStart.id, mathKind: mStart.kind }); setPendingBox(null); return }
+        if (mStart && mEnd && mStart.id === mEnd.id) { setPending({ kind: 'math', mathId: mStart.id, mathKind: mStart.kind }); return }
         // A selection that crosses inline math now falls through to mapSelection: the
         // atomic math unit keeps text offsets aligned, so the passage (including a
         // formula) is markable as one text annotation instead of the bar vanishing.
         const result = mapSelection(msgEl, messageId, range, (b) => blocks.get(b))
-        if (result.kind === 'text' && result.segments.length) { setPending(result); const r = range.getBoundingClientRect(); setPendingBox({ left: Math.min(r.left + r.width, window.innerWidth - 90), top: Math.max(8, r.top - 44) }) }
-        else if (result.kind === 'table-cross-cell') { setPending(result); const r = range.getBoundingClientRect(); setPendingBox({ left: Math.min(r.left + r.width, window.innerWidth - 90), top: Math.max(8, r.top - 44) }) }
-        else { setPending(result); setPendingBox(null) }
-      } catch { setPending(null); setPendingBox(null) }
+        if (result.kind === 'text' && result.segments.length) { setPending(result) }
+        else if (result.kind === 'table-cross-cell') { setPending(result) }
+        else { setPending(result) }
+      } catch { setPending(null) }
     }
     document.addEventListener('selectionchange', onSelChange)
     document.addEventListener('pointerdown', onPointerDown)
@@ -81,17 +78,17 @@ export function AnnotatedMarkdown({ content, messageId, conversationId }: { cont
     return () => { document.removeEventListener('selectionchange', onSelChange); document.removeEventListener('pointerdown', onPointerDown); document.removeEventListener('pointerup', onSelChange); document.removeEventListener('touchend', onSelChange) }
   }, [messageId, content, canonicalOf])
 
-  const markCrossCell = () => { if (!pending || pending.kind !== 'table-cross-cell') return; const a = pending.startCell, b = pending.endCell; const bounds = normalizeBounds(a.row, a.column, b.row, b.column); void toggleTableCellsMessage(conversationId, messageId, pending.tableId, bounds); window.getSelection()?.removeAllRanges(); setPending(null); setPendingBox(null) }
-  const onMathAction = (mathId: string, kind: 'inline' | 'block') => { setPending({ kind: 'math', mathId, mathKind: kind }); setPendingBox(null) }
+  const markCrossCell = () => { if (!pending || pending.kind !== 'table-cross-cell') return; const a = pending.startCell, b = pending.endCell; const bounds = normalizeBounds(a.row, a.column, b.row, b.column); void toggleTableCellsMessage(conversationId, messageId, pending.tableId, bounds); window.getSelection()?.removeAllRanges(); setPending(null) }
+  const onMathAction = (mathId: string, kind: 'inline' | 'block') => { setPending({ kind: 'math', mathId, mathKind: kind }) }
   function doToggle() {
     try {
     if (!pending) return
-    if (pending.kind === 'math') { void toggleMathMessage(conversationId, messageId, pending.mathId, pending.mathKind); window.getSelection()?.removeAllRanges(); setPending(null); setPendingBox(null); return }
+    if (pending.kind === 'math') { void toggleMathMessage(conversationId, messageId, pending.mathId, pending.mathKind); window.getSelection()?.removeAllRanges(); setPending(null); return }
     if (pending.kind !== 'text') return
     toggleMessageSelection(conversationId, messageId, pending.segments, canonicalOf)
     window.getSelection()?.removeAllRanges()
-    setPending(null); setPendingBox(null)
-    } catch { try { window.getSelection()?.removeAllRanges() } catch {}; setPending(null); setPendingBox(null) }
+    setPending(null)
+    } catch { try { window.getSelection()?.removeAllRanges() } catch {}; setPending(null) }
   }
   const mathCovered = pending && pending.kind === 'math' ? hasMath(annotations, pending.mathId) : false
   const fullyCovered = pending && pending.kind === 'text' ? shouldToggleAll(pending.segments.map((s) => ({ anchor: s.cell ? { scope: 'table-cell', tableId: s.cell.tableId, row: s.cell.row, column: s.cell.column } : { scope: 'block', blockId: s.blockId }, start: s.start, end: s.end })), annotations) === 'remove' : mathCovered
@@ -112,3 +109,4 @@ export function AnnotatedMarkdown({ content, messageId, conversationId }: { cont
     </div>
   )
 }
+

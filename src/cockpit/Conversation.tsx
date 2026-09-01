@@ -4,6 +4,7 @@ import { useSessions, sessionsActions } from '../engine/sessions-store'
 import { useSettings } from '../engine/settings-store'
 import { uiActions } from '../engine/ui-store'
 import { saveFiles, deleteAttachment, attachmentErrorLabel } from '../engine/attachment-service'
+import { useDraft, setDraftText, addDraftImages, removeDraftImage, clearDraft } from '../engine/draft-store'
 import { useAttachmentPreview } from '../engine/use-attachment-preview'
 import { t } from '../engine/locale'
 import { MessageText, IconCloseOutline16 } from '../dsh/primitives'
@@ -124,20 +125,27 @@ function PendingThumb({ id, onRemove, onOpen }: { id: string; onRemove: () => vo
 }
 
 function Composer({ sessionId, busy }: { sessionId: string | undefined; busy: boolean }) {
-  const [text, setText] = useState('')
-  const [picIds, setPicIds] = useState<string[]>([])
+  // Draft is keyed by conversation, so switching A<->B shows each one's own text/images.
+  const key = sessionId ?? '__none__'
+  const draft = useDraft(key)
   const [openId, setOpenId] = useState<string | null>(null)
   const [photoError, setPhotoError] = useState<string | undefined>(undefined)
+  // Reset ephemeral view state (lightbox / error banner) when the active conversation changes.
+  const prevSession = useRef(sessionId)
+  useEffect(() => { if (prevSession.current !== sessionId) { setOpenId(null); setPhotoError(undefined); prevSession.current = sessionId } }, [sessionId])
+  const text = draft.text
+  const picIds = draft.imageIds
   const onFiles = async (files: FileList) => {
     try {
       const atts = await saveFiles([...files])
-      setPicIds(p => [...p, ...atts.map(a => a.id)])
+      addDraftImages(key, atts.map(a => a.id))
       setPhotoError(undefined)
     } catch (e: any) {
       setPhotoError(attachmentErrorLabel(e?.kind || 'read-failed'))
     }
   }
-  const removePic = (id: string) => { setPicIds(ps => ps.filter(x => x !== id)); void deleteAttachment(id) }
+  // User removes a pending draft image explicitly -> the attachment is gone for good.
+  const removePic = (id: string) => { removeDraftImage(key, id); void deleteAttachment(id) }
   // Focus drives an immediate jump above the on-screen keyboard (measured once, no polling).
   const onFocusJump = (e: any) => {
     try { e.currentTarget.scrollIntoView({ block: 'nearest', behavior: 'auto' }) } catch {}
@@ -146,11 +154,13 @@ function Composer({ sessionId, busy }: { sessionId: string | undefined; busy: bo
     if (inset > 0) document.documentElement.style.setProperty('--dsw-keyboard-inset', inset + 'px')
   }
   const onBlurReset = () => { document.documentElement.style.setProperty('--dsw-keyboard-inset', '0px') }
-  const send = () => {
+  const send = async () => {
     if (!sessionId || busy) return
     if (!text.trim() && picIds.length === 0) return
-    sessionsActions.sendUserMessage(sessionId, text.trim(), picIds)
-    setText(''); setPicIds([]); setPhotoError(undefined)
+    const ok = await sessionsActions.sendUserMessage(sessionId, text.trim(), picIds)
+    // Only clear the draft once the user message is ACCEPTED & persisted; the image ids
+    // then belong to the message (ownership transfer), so we must NOT delete them here.
+    if (ok) { clearDraft(sessionId); setPhotoError(undefined); setOpenId(null) }
   }
   return (
     <div className={css.composer}>
@@ -167,8 +177,8 @@ function Composer({ sessionId, busy }: { sessionId: string | undefined; busy: bo
           <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M8 1a2.5 2.5 0 0 1 2.5 2.5v4a2.5 2.5 0 0 1-5 0v-4A2.5 2.5 0 0 1 8 1zM3 8a5 5 0 0 0 10 0h-1.6a3.4 3.4 0 0 1-6.8 0H3z"/></svg>
         </label>
         <textarea className={css.composerText} value={text} placeholder={t('composer.placeholder')} onFocus={onFocusJump} onBlur={onBlurReset}
-          onChange={e => setText(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} />
+          onChange={e => setDraftText(key, e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send() } }} />
         <button className={css.sendBtn} onClick={send} disabled={busy}>{busy ? '生成中' : '发送'}</button>
       </div>
       {openId && <Lightbox id={openId} onClose={() => setOpenId(null)} />}
