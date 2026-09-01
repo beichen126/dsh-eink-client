@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
-import { type Conversation, type Message, type Attachment, newStableId, NEW_TITLE } from './types'
+import { type Conversation, type Message, type Attachment, type StableId, newStableId, NEW_TITLE } from './types'
+import { sanitizeTitle } from './session-title'
 import { getSetting, setSetting, saveConversation, deleteConversation, listConversations } from '../storage/storage'
 import { getSettingsSnapshot } from './settings-store'
 import { streamTextChat, DeepSeekError, errorKindLabel, buildApiMessages, buildRequestMessages, countImageParts, isVisionModel } from '../api/deepseek'
@@ -130,7 +131,10 @@ export const sessionsActions = {
   },
   async setTitle(id: string, title: string) {
     const conv = state.byId[id]; if (!conv) return
-    const updated: Conversation = { ...conv, title, updatedAt: Date.now() }
+    const clean = sanitizeTitle(title)
+    // Never store an empty / whitespace-only title; a no-op rename just returns.
+    if (!clean) return
+    const updated: Conversation = { ...conv, title: clean, updatedAt: Date.now() }
     upsertState(updated); await saveConversation(updated)
   },
   async remove(id: string) {

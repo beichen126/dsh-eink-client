@@ -1,7 +1,7 @@
 import { getAnnotationsByMessage, saveAnnotations, deleteAnnotationsByIds, deleteConversationAnnotations } from '../storage/storage'
-import { shouldToggleAll, makeAnnotation, normalizeAnchor, sameAnchor, toggleWithin, rebuildQuote, toggleTableCells as tc, toggleWholeTable as wt, toggleMath as tm } from './annotation-ops'
+import { shouldToggleAll, makeAnnotation, normalizeAnchor, sameKey, toggleWithin, rebuildQuote, toggleTableCells as tc, toggleWholeTable as wt, toggleMath as tm } from './annotation-ops'
 import type { TableBounds } from './annotation-types'
-import type { Annotation, TextAnchor } from './annotation-types'
+import type { Annotation, TextAnchor, TextAnnotationTarget } from './annotation-types'
 import type { TextSelectionSegment } from './selection-types'
 
 type CanonicalOf = (anchor: TextAnchor) => string
@@ -9,14 +9,14 @@ type CanonicalOf = (anchor: TextAnchor) => string
 export async function loadMessageAnnotations(conversationId: string, messageId: string): Promise<Annotation[]> { return getAnnotationsByMessage(conversationId, messageId) }
 export async function deleteConvAnnotations(conversationId: string): Promise<void> { await deleteConversationAnnotations(conversationId) }
 
-function requote(a: Annotation, canonical: string): Annotation { return { ...a, target: { ...a.target, quote: rebuildQuote(canonical, a.target.start, a.target.end) } } }
+function requote(a: Annotation, canonical: string): Annotation { const t = a.target as TextAnnotationTarget; return { ...a, target: { ...t, quote: rebuildQuote(canonical, t.start, t.end) } } }
 
 function applyMode(conversationId: string, messageId: string, segs: { anchor: TextAnchor; start: number; end: number }[], existing: Annotation[], mode: 'add' | 'remove', canonicalOf: CanonicalOf): Annotation[] {
   let cur = existing
   for (const st of segs) {
     const canon = canonicalOf(st.anchor)
-    const inAnchor = cur.filter((a) => sameAnchor(a.target.anchor, st.anchor))
-    const outAnchor = cur.filter((a) => !sameAnchor(a.target.anchor, st.anchor))
+    const inAnchor = cur.filter((a) => sameKey(a, st.anchor))
+    const outAnchor = cur.filter((a) => !sameKey(a, st.anchor))
     if (mode === 'add') {
       const merged = normalizeAnchor([...inAnchor, makeAnnotation(conversationId, messageId, st.anchor, canon, st.start, st.end)], st.anchor).map((a) => requote(a, canon))
       cur = [...outAnchor, ...merged]

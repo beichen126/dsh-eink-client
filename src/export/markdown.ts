@@ -126,21 +126,24 @@ export function markedOnlyMarkdown(conv: Conversation, anns: Annotation[]): stri
     const usedTables = new Set<string>()
     for (const a of list) {
       const t = a.target
-      if (t.type === 'text' && t.anchor.scope === 'block') {
-        const model = models.find((x) => x.id === t.anchor.blockId)
-        const node = blocks.get(t.anchor.blockId)
-        const canon = node ? blockMap(node).canonical : (model?.canonicalText || '')
-        const txt = (canon.length ? canon.slice(t.start, t.end) : '') || t.quote.exact || ''
-        if (!txt) continue
-        items.push({ role, context: model?.headingPath || [], md: '<mark>' + txt + '</mark>', blockStart: model?.sourceStart ?? 0, start: t.start })
-      } else if (t.type === 'text' && t.anchor.scope === 'table-cell') {
-        const model = tableModelFor(models, t.anchor.tableId)
-        const node = tables.get(t.anchor.tableId)
-        if (node && !usedTables.has(t.anchor.tableId)) { usedTables.add(t.anchor.tableId); items.push({ role, context: model?.headingPath || [], md: TABLE_START + '\n' + tableSource(m.content, node) + '\n' + TABLE_END, blockStart: startOf(node), start: t.start }) }
+      if (t.type === 'text') {
+        const anchor = t.anchor
+        if (anchor.scope === 'block') {
+          const model = models.find((x) => x.id === anchor.blockId)
+          const node = blocks.get(anchor.blockId)
+          const canon = node ? blockMap(node).canonical : (model?.canonicalText || '')
+          const txt = (canon.length ? canon.slice(t.start, t.end) : '') || t.quote.exact || ''
+          if (!txt) continue
+          items.push({ role, context: model?.headingPath || [], md: '<mark>' + txt + '</mark>', blockStart: model?.sourceStart ?? 0, start: t.start })
+        } else if (anchor.scope === 'table-cell') {
+          const model = tableModelFor(models, anchor.tableId)
+          const node = tables.get(anchor.tableId)
+          if (node && !usedTables.has(anchor.tableId)) { usedTables.add(anchor.tableId); items.push({ role, context: model?.headingPath || [], md: TABLE_START + '\n' + tableSource(m.content, node) + '\n' + TABLE_END, blockStart: startOf(node), start: t.start }) }
+        }
       } else if (t.type === 'table' || t.type === 'table-cells') {
         const model = tableModelFor(models, t.tableId)
         const node = tables.get(t.tableId)
-        if (node && !usedTables.has(t.tableId)) { usedTables.add(t.tableId); items.push({ role, context: model?.headingPath || [], md: TABLE_START + '\n' + tableSource(m.content, node) + '\n' + TABLE_END, blockStart: startOf(node), start: t.start }) }
+        if (node && !usedTables.has(t.tableId)) { usedTables.add(t.tableId); items.push({ role, context: model?.headingPath || [], md: TABLE_START + '\n' + tableSource(m.content, node) + '\n' + TABLE_END, blockStart: startOf(node), start: 0 }) }
       } else if (t.type === 'math') {
         const entry = maths.get(t.mathId)
         if (entry) {

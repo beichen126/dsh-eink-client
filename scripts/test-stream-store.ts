@@ -43,7 +43,7 @@ await initStore()
 {
   const id = await sessionsActions.newChat()
   const enc = new TextEncoder()
-  fetchMock = async () => new Response(new ReadableStream<Uint8Array>({ start(c){ c.enqueue(enc.encode(delta('部分'))); c.enqueue(enc.encode(delta('内容'))); c.error(new Error('socket closed')) } }), { status:200 })
+  fetchMock = async () => new Response(new ReadableStream<Uint8Array>({ start(c){ c.enqueue(enc.encode(delta('部分'))); c.enqueue(enc.encode(delta('内容'))); setTimeout(()=>c.error(new Error('socket closed')), 40) } }), { status:200 })
   await sessionsActions.sendUserMessage(id, '问题', [])
   await new Promise(r=>setTimeout(r,120))
   const conv = await getConversation(id); const msgs = conv ? conv.messages : []

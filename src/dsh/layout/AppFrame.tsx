@@ -14,10 +14,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { ReactNode } from 'react'
 import type {
   PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
-} from '../engine/slot-types'
+} from '../../engine/slot-types'
 import { computeColumns, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT } from './columns.ts'
 import { DocumentTitle } from './DocumentTitle.tsx'
-import type { LayoutState } from '../engine/layout-store'
+import type { LayoutState } from '../../engine/layout-store'
 import css from './AppFrame.module.css'
 
 /** Full composed props: runtime share + child-slot render share + store share. */
@@ -99,7 +99,7 @@ export function AppFrame({
   const panels = useStore(s => s)
   const detailsSession = useSessions((s) => {
     const current = s.current
-    return current !== undefined && s.byId[current]?.blank === false ? current : undefined
+    return current !== undefined && (s.byId[current] as any)?.blank === false ? current : undefined
   })
   const documentTitle = useSessions((s) => {
     const current = s.current
@@ -170,7 +170,8 @@ export function AppFrame({
   const onDetailsDrag = useCallback((dx: number) => {
     actions.setDetails(detailsBase.current - dx)
   }, [actions])
-  const productTitle = process.env.DSH_CLIENT_TITLE ?? t('brand.localBuild')
+  // process is not defined on e-ink browsers; read it defensively so this never throws.
+const productTitle = ((globalThis as any).process?.env?.DSH_CLIENT_TITLE) ?? t('brand.localBuild')
 
   return (
     <div

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { loadMessageAnnotations, toggleTextSelection, toggleTableCellsAnnotation, toggleWholeTableAnnotation, toggleMathAnnotation } from './annotation-service'
+import { loadMessageAnnotations, toggleTextSelection, toggleTableCellsAnnotation, toggleWholeTableAnnotation, toggleMathAnnotation, deleteConvAnnotations } from './annotation-service'
 import type { Annotation } from './annotation-types'
 import type { TextAnchor } from './annotation-types'
 import type { TextSelectionSegment } from './selection-types'

@@ -106,7 +106,7 @@ async function runStream(chunks: string[], expect: string): Promise<string> {
 // ---- test 10: AbortController ----
 {
   const orig = globalThis.fetch
-  globalThis.fetch = ((_u: any, init: any) => new Promise((_res, rej) => { (init as any).signal.addEventListener('abort', () => rej(new DOMException('aborted', 'AbortError'))) })) as any
+  globalThis.fetch = ((_u: any, init: any) => new Promise((_res, rej) => { const sig = (init as any).signal; if (sig.aborted) { rej(new DOMException('aborted', 'AbortError')); return } sig.addEventListener('abort', () => rej(new DOMException('aborted', 'AbortError'))) })) as any
   const c = new AbortController(); c.abort()
   let kind = ''
   try { await streamTextChat({ apiKey: 'k', baseUrl: 'https://api.deepseek.com', model: 'm', messages: [], signal: c.signal, onDelta: () => {} }) } catch (e) { kind = (e as DeepSeekError).kind }

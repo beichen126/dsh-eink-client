@@ -1,6 +1,9 @@
-
 import { newStableId } from '../engine/types'
-import type { Annotation, TextAnnotationTarget } from './annotation-types'
+import type { Annotation, TextAnnotationTarget, TextAnchor, TableBounds } from './annotation-types'
+
+/** Narrow an annotation to its text target, or undefined for math/table/table-cells targets. */
+function tgt(a: Annotation): TextAnnotationTarget | undefined { return a.target.type === 'text' ? a.target : undefined }
+export function sameKey(a: Annotation, anchor: TextAnchor): boolean { const t = tgt(a); return !!t && sameAnchor(t.anchor, anchor) }
 
 /** anchor key — annotations never merge across different blocks / table cells. */
 export function anchorKey(a: TextAnchor): string {
@@ -35,42 +38,45 @@ export function makeAnnotation(conversationId: string, messageId: string, anchor
  * (and by precedence earliest-created) annotation's ID.
  */
 export function normalizeAnchor(anns: Annotation[], anchor: TextAnchor): Annotation[] {
-  const mine = anns.filter((a) => sameAnchor(a.target.anchor, anchor))
+  const mine = anns.filter((a) => sameKey(a, anchor))
   if (mine.length === 0) return []
-  const sorted = [...mine].sort((a, b) => a.target.start - b.target.start || (a.createdAt - b.createdAt))
+  const sorted = [...mine].sort((a, b) => tgt(a)!.start - tgt(b)!.start || (a.createdAt - b.createdAt))
   const out: Annotation[] = []
   for (const a of sorted) {
     if (out.length === 0) { out.push(a); continue }
     const last = out[out.length - 1]
-    const s = a.target.start, e = a.target.end
+    const ta = tgt(a)!, tl = tgt(last)!
+    const s = ta.start, e = ta.end
     // overlap or adjacency
-    if (s <= last.target.end) {
-      const newStart = Math.min(last.target.start, s)
-      const newEnd = Math.max(last.target.end, e)
-      out[out.length - 1] = { ...last, target: { ...last.target, start: newStart, end: newEnd, quote: { ...last.target.quote } }, updatedAt: Date.now() }
-      out[out.length - 1].target.quote = rebuildQuote('', newStart, newEnd) // caller re-quotes with canonical
+    if (s <= tl.end) {
+      const newStart = Math.min(tl.start, s)
+      const newEnd = Math.max(tl.end, e)
+      const mergedTarget: TextAnnotationTarget = { ...tl, start: newStart, end: newEnd, quote: { ...tl.quote } }
+      out[out.length - 1] = { ...last, target: mergedTarget, updatedAt: Date.now() }
+      mergedTarget.quote = rebuildQuote('', newStart, newEnd) // caller re-quotes with canonical
     } else out.push(a)
   }
   return out
 }
 
 /**
- * Toggle a [start,end) interval within one anchor over a canonical text.
+ * Toggle a [start,end) interval over one anchor within a canonical text.
  * Returns { keep, add } where keep are normalized surviving annotations (fully same anchor) and add are new annotations to insert.
  * Rule: if the interval is fully covered by existing coverage -> subtract (split), otherwise union (add, merging overlaps).
  */
 export function toggleWithin(canonical: string, conversationId: string, messageId: string, anchor: TextAnchor, start: number, end: number, existing: Annotation[]): { remove: Annotation[]; keep: Annotation[]; add: Annotation[] } {
-  const anchorAnns = existing.filter((a) => sameAnchor(a.target.anchor, anchor))
+  const anchorAnns = existing.filter((a) => sameKey(a, anchor))
   const covered = isCoveredBy(anchorAnns, start, end)
-  const requote2 = (a: Annotation) => ({ ...a, target: { ...a.target, quote: rebuildQuote(canonical, a.target.start, a.target.end) } })
+  const requote2 = (a: Annotation): Annotation => { const t = tgt(a)!; return { ...a, target: { ...t, quote: rebuildQuote(canonical, t.start, t.end) } } }
   if (covered) {
     const keep: Annotation[] = []
     const remove: Annotation[] = []
     for (const a of anchorAnns) {
-      const as = a.target.start, ae = a.target.end
+      const t = tgt(a)!
+      const as = t.start, ae = t.end
       if (start <= as && ae <= end) { remove.push(a); continue }
-      if (as < start) keep.push({ ...a, target: { ...a.target, start: as, end: start }, updatedAt: Date.now() })
-      if (ae > end) keep.push({ ...a, id: newStableId(), target: { ...a.target, start: end, end: ae }, updatedAt: Date.now() })
+      if (as < start) keep.push({ ...a, target: { ...t, start: as, end: start }, updatedAt: Date.now() })
+      if (ae > end) keep.push({ ...a, id: newStableId(), target: { ...t, start: end, end: ae }, updatedAt: Date.now() })
       remove.push(a)
     }
     return { remove, keep: normalizeAnchor(keep, anchor).map(requote2), add: [] }
@@ -78,28 +84,27 @@ export function toggleWithin(canonical: string, conversationId: string, messageI
   const merged = normalizeAnchor([...anchorAnns, makeAnnotation(conversationId, messageId, anchor, canonical, start, end)], anchor).map(requote2)
   const mergedIds = new Set(merged.map((m) => m.id))
   const remove = anchorAnns.filter((a) => !mergedIds.has(a.id))
-  const nonAnchor = existing.filter((a) => !sameAnchor(a.target.anchor, anchor))
+  const nonAnchor = existing.filter((a) => !sameKey(a, anchor))
   return { remove, keep: [...nonAnchor, ...merged], add: [] }
 }
 
 function isCoveredBy(anns: Annotation[], start: number, end: number): boolean {
   if (anns.length === 0) return false
-  const sorted = [...anns].sort((a, b) => a.target.start - b.target.start)
+  const sorted = [...anns].sort((a, b) => tgt(a)!.start - tgt(b)!.start)
   let cur = start
   for (const a of sorted) {
-    if (a.target.start > cur) return false
-    cur = Math.max(cur, a.target.end)
+    const t = tgt(a)!
+    if (t.start > cur) return false
+    cur = Math.max(cur, t.end)
     if (cur >= end) return true
   }
   return cur >= end
 }
 export function shouldToggleAll(segs: { anchor: TextAnchor; start: number; end: number }[], existing: Annotation[]): 'add' | 'remove' {
-  const allCovered = segs.every((seg) => isCoveredBy(existing.filter((a) => sameAnchor(a.target.anchor, seg.anchor)), seg.start, seg.end))
+  const allCovered = segs.every((seg) => isCoveredBy(existing.filter((a) => sameKey(a, seg.anchor)), seg.start, seg.end))
   return allCovered ? 'remove' : 'add'
 }
-function requote(a: Annotation, canonical: string): Annotation { return { ...a, target: { ...a.target, quote: rebuildQuote(canonical, a.target.start, a.target.end) } } }
-
-import type { TableBounds } from './annotation-types'
+function requote(a: Annotation, canonical: string): Annotation { const t = tgt(a)!; return { ...a, target: { ...t, quote: rebuildQuote(canonical, t.start, t.end) } } }
 
 /** Normalize two cell points (any drag direction) into a closed rectangle bounds. */
 export function normalizeBounds(ar: number, ac: number, br: number, bc: number): TableBounds {
@@ -115,7 +120,7 @@ export function boundsCoverCell(b: TableBounds, row: number, col: number): boole
 /** table-cells toggle: exact duplicate rectangle -> remove; otherwise create (partial overlap coexists, no 2D merge/split). */
 export function toggleTableCells(conversationId: string, messageId: string, tableId: string, bounds: TableBounds, existing: Annotation[]): { remove: Annotation[]; keep: Annotation[]; add: Annotation[] } {
   const mine = existing.filter((a) => a.target.type === 'table-cells' && a.target.tableId === tableId)
-  const dup = mine.find((a) => sameBounds(a.target.bounds, bounds))
+  const dup = mine.find((a) => a.target.type === 'table-cells' && sameBounds(a.target.bounds, bounds))
   if (dup) return { remove: [dup], keep: existing.filter((a) => a.id !== dup.id), add: [] }
   const now = Date.now()
   const newAnn: Annotation = { id: newStableId(), conversationId, messageId, target: { type: 'table-cells', tableId, bounds }, createdAt: now, updatedAt: now, version: 1 }
@@ -148,3 +153,4 @@ export function hasWholeTable(existing: Annotation[], tableId: string): boolean 
 export function hasExactRectangle(existing: Annotation[], tableId: string, bounds: TableBounds): boolean { return existing.some((a) => a.target.type === 'table-cells' && a.target.tableId === tableId && sameBounds(a.target.bounds, bounds)) }
 /** Whether a rectangle annotation covers a cell. */
 export function rectangleCoversCell(existing: Annotation[], tableId: string, row: number, col: number): boolean { return existing.some((a) => a.target.type === 'table-cells' && a.target.tableId === tableId && boundsCoverCell(a.target.bounds, row, col)) }
+

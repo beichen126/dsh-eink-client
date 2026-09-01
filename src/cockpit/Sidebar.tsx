@@ -5,18 +5,10 @@ import { uiActions } from '../engine/ui-store'
 import { galleryActions } from '../gallery/gallery-store'
 import { layoutStore, useLayoutStore } from '../engine/layout-store'
 import { NEW_TITLE } from '../engine/types'
+import { displayTitle, sanitizeTitle, MAX_TITLE_LEN } from '../engine/session-title'
 import { Button, IconNewChatOutline16, IconSearchOutline16, IconSettingsOutline16, Input } from '../dsh/primitives'
 import css from './cockpit.module.css'
 
-function displayTitle(s: ChatSession): string {
-  if (s.title && s.title !== NEW_TITLE) return s.title
-  const first = s.messages.find((m: any) => m.role === 'user')
-  if (!first) return '新会话'
-  const raw = String(first.content || '')
-  const stripped = raw.replace(/[*_~\[\]()#>]/g, '').replace(/\s+/g, ' ').trim()
-  if (!stripped) return (first.images && first.images.length) ? '图片对话' : NEW_TITLE
-  return stripped.length > 24 ? stripped.slice(0, 24) + '…' : stripped
-}
 function useFullscreen() {
   const [fs, setFs] = useState(false)
   useEffect(() => { const on = () => setFs(!!document.fullscreenElement); document.addEventListener('fullscreenchange', on); return () => document.removeEventListener('fullscreenchange', on) }, [])
@@ -32,7 +24,8 @@ export function Sidebar({ collapsed, width }: { collapsed: boolean; width: numbe
   const busy = status === 'sending' || status === 'streaming'
   const [q, setQ] = useState('')
   const { fs, toggle } = useFullscreen()
-  const filtered = q ? sessions.filter(s => s.title.toLowerCase().includes(q.toLowerCase())) : sessions
+  // Search the same text the user sees (displayTitle), so auto/manual titles are findable.
+  const filtered = q ? sessions.filter(s => displayTitle(s).toLowerCase().includes(q.toLowerCase())) : sessions
   const fsTitle = fs ? '退出全屏' : '全屏'
   const narrow = useLayoutStore(s => s.narrow)
   const openHistory = () => { if (narrow) layoutStore.actions.openNarrowSidebar(); else layoutStore.actions.toggleSidebar() }
@@ -68,9 +61,37 @@ export function Sidebar({ collapsed, width }: { collapsed: boolean; width: numbe
 }
 
 function SessionRow({ session, active, busy, narrow }: { session: ChatSession; active: boolean; busy: boolean; narrow: boolean }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [renameVal, setRenameVal] = useState('')
   const [confirming, setConfirming] = useState(false)
-  const doDelete = () => { if (confirming) { sessionsActions.remove(session.id); setConfirming(false) } else setConfirming(true) }
   const onOpen = () => { if (busy) { window.alert('正在生成，请先停止生成'); return } sessionsActions.open(session.id); if (narrow) layoutStore.actions.closeNarrowSidebar() }
+  const startRename = () => { setMenuOpen(false); setConfirming(false); setRenameVal(displayTitle(session)); setRenaming(true) }
+  const commitRename = () => {
+    const v = sanitizeTitle(renameVal)
+    // Empty/whitespace-only title is never saved; a no-op rename just exits.
+    if (v && v !== displayTitle(session)) void sessionsActions.setTitle(session.id, v)
+    setRenaming(false)
+  }
+  const cancelRename = () => setRenaming(false)
+  const onDeleteClick = () => { setMenuOpen(false); setConfirming(true) }
+  const doDelete = () => { if (confirming) { sessionsActions.remove(session.id); setConfirming(false) } }
+
+  if (renaming) {
+    return (
+      <div className={css.sessionRowWrap + (active ? ' ' + css.sessionRowWrapActive : '')}>
+        <div className={css.rowRename}>
+          <input className={css.rowRenameInput} autoFocus value={renameVal} maxLength={MAX_TITLE_LEN}
+            onChange={e => setRenameVal(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitRename() } else if (e.key === 'Escape') { e.preventDefault(); cancelRename() } }}
+            onBlur={cancelRename}
+          />
+          <button className={css.rowRenameBtn} onMouseDown={e => e.preventDefault()} onClick={commitRename}>确定</button>
+          <button className={css.rowRenameBtn} onMouseDown={e => e.preventDefault()} onClick={cancelRename}>取消</button>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className={css.sessionRowWrap + (active ? ' ' + css.sessionRowWrapActive : '')}>
       <button className={css.sessionRow} onClick={onOpen}>
@@ -78,8 +99,17 @@ function SessionRow({ session, active, busy, narrow }: { session: ChatSession; a
         <span className={css.sessionTitle}>{displayTitle(session)}</span>
         <span className={css.sessionCount}>{session.messages.length}</span>
       </button>
-      <button className={css.rowMenu} title="操作" onClick={doDelete}><span className={css.rowMenuDots}>⋯</span></button>
-      {confirming && <div className={css.rowConfirm}><span>删除这个会话？</span><button onClick={doDelete}>删除</button><button onClick={() => setConfirming(false)}>取消</button></div>}
+      <button className={css.rowMenu} title="操作" onClick={() => setMenuOpen(o => !o)}><span className={css.rowMenuDots}>⋯</span></button>
+      {menuOpen && (
+        <div className={css.rowMenuPopup}>
+          <button className={css.rowMenuItem} onClick={startRename}>重命名</button>
+          <button className={css.rowMenuItem} onClick={onDeleteClick} data-danger>删除</button>
+        </div>
+      )}
+      {confirming && (
+        <div className={css.rowConfirm}><span>删除这个会话？</span><button onClick={doDelete}>删除</button><button onClick={() => setConfirming(false)}>取消</button></div>
+      )}
     </div>
   )
 }
+
