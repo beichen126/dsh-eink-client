@@ -19,7 +19,23 @@ function renderSlot(key: string, owner?: any): ReactNode {
   return null
 }
 
+function useKeyboardInset(): void {
+  useEffect(() => {
+    const setInset = () => {
+      const vv = window.visualViewport
+      const inset = vv ? Math.max(0, window.innerHeight - vv.height) : 0
+      document.documentElement.style.setProperty('--dsw-keyboard-inset', inset + 'px')
+    }
+    setInset()
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', setInset)
+    else window.addEventListener('resize', setInset)
+    window.addEventListener('orientationchange', setInset)
+    return () => { if (window.visualViewport) window.visualViewport.removeEventListener('resize', setInset); else window.removeEventListener('resize', setInset); window.removeEventListener('orientationchange', setInset) }
+  }, [])
+}
+
 export function App() {
+  useKeyboardInset()
   const ready = useSessions(s => s.ready)
   const settingsOpen = useUi(s => s.settingsOpen)
   useEffect(() => { void (async () => { await initSettings(); await initStore() })() }, [])
