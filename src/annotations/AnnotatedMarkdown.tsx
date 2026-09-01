@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MarkdownBlocks } from '../markdown/MarkdownBlocks'
 import { mapSelection } from './selection-mapper'
-import { resolveToRange } from './range-resolver'
+import { resolveToRange, resolveByExact } from './range-resolver'
 import { buildBlockMap } from './canonical'
 import { useMessageAnnotations, toggleMessageSelection, toggleTableCellsMessage, toggleWholeTableMessage, toggleMathMessage, refreshMessageAnnotations } from './annotation-store'
 import { setMessageRanges, removeMessageRanges, highlightSupported } from './highlight-registry'
@@ -24,7 +24,17 @@ export function AnnotatedMarkdown({ content, messageId, conversationId }: { cont
     const msgEl = wrapRef.current?.querySelector('[data-message-id]')
     if (!msgEl) return
     let ranges: Range[] = []
-    try { ranges = annotations.filter((a) => a.target.type === 'text').map((a) => resolveToRange(msgEl, messageId, a.target as any)).filter((r): r is Range => !!r) } catch { ranges = [] }
+    try {
+      ranges = annotations.filter((a) => a.target.type === 'text').map((a) => {
+        const t = a.target as any
+        const r = resolveToRange(msgEl, messageId, t)
+        const exact = t.quote && typeof t.quote.exact === 'string' ? t.quote.exact : undefined
+        if (r && (!exact || r.toString() === exact)) return r
+        // Stale offset (re-parsed content): re-anchor to the stored exact text.
+        try { const byExact = resolveByExact(msgEl, messageId, exact); if (byExact) return byExact } catch {}
+        return r
+      }).filter((r): r is Range => !!r)
+    } catch { ranges = [] }
     try { setMessageRanges(messageId, ranges) } catch { /* never crash the app on a bad highlight range */ }
     return () => { try { removeMessageRanges(messageId) } catch {} }
   }, [annotations, messageId, content, hasHl])
