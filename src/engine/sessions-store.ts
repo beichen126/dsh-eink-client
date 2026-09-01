@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { type Conversation, type Message, type Attachment, newStableId, NEW_TITLE } from './types'
 import { getSetting, setSetting, saveConversation, deleteConversation, listConversations } from '../storage/storage'
 import { getSettingsSnapshot } from './settings-store'
-import { streamTextChat, DeepSeekError, errorKindLabel, buildApiMessages, buildRequestMessages, isVisionModel } from '../api/deepseek'
+import { streamTextChat, DeepSeekError, errorKindLabel, buildApiMessages, buildRequestMessages, countImageParts, isVisionModel } from '../api/deepseek'
 import { toDataUrl, deleteAttachment, attachmentErrorLabel } from './attachment-service'
 import { deleteConvAnnotations } from '../annotations/annotation-service'
 
@@ -95,6 +95,15 @@ export const sessionsActions = {
       if (hasImages && !isVisionModel(settings.model)) { setState({ ...state, status: 'error', sendError: attachmentErrorLabel('vision-unsupported') }); abortControllerRef = null; return }
       const apiMessages = await buildApiMessages(afterUser.messages, toDataUrl)
       const reqMessages = buildRequestMessages(apiMessages, settings)
+      // Invariant (§16): the outgoing request must encode exactly the images the user
+      // attached. If not, block the fetch and tell the user — never silently drop one.
+      const expectedImages = afterUser.messages.reduce((sum, mm) => sum + mm.images.length, 0)
+      const encodedImages = countImageParts(reqMessages)
+      if (encodedImages !== expectedImages) {
+        setState({ ...state, status: 'error', sendError: '图片准备失败：已选择 ' + expectedImages + ' 张，实际仅准备成功 ' + encodedImages + ' 张。请检查附件后重试。' })
+        abortControllerRef = null
+        return
+      }
       const r = await streamTextChat({ apiKey: settings.apiKey, baseUrl: settings.apiBaseUrl, model: settings.model, messages: reqMessages, signal: controller.signal, onDelta })
       received = r.content
       commit()

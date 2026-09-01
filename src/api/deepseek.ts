@@ -184,15 +184,26 @@ export async function buildApiMessages(msgs: import('../engine/types').Message[]
   for (const m of msgs) {
     if (m.role === 'assistant') { out.push({ role: 'assistant', content: m.content }); continue }
     if (m.images.length > 0) {
+      // Interleave an explicit 【图片 k/N】 text identity before every image so the
+      // model can count and order a large batch of unlabeled images reliably.
       const parts: ChatContentPart[] = []
       if (m.content) parts.push({ type: 'text', text: m.content })
-      for (const id of m.images) parts.push({ type: 'image_url', image_url: { url: await toDataUrl(id) } })
+      for (let idx = 0; idx < m.images.length; idx++) {
+        parts.push({ type: 'text', text: '【图片 ' + (idx + 1) + '/' + m.images.length + '】' })
+        parts.push({ type: 'image_url', image_url: { url: await toDataUrl(m.images[idx]) } })
+      }
       out.push({ role: 'user', content: parts })
     } else {
       out.push({ role: 'user', content: m.content })
     }
   }
   return out
+}
+/** Count image_url content parts across a message list (for the send invariant). */
+export function countImageParts(msgs: ApiChatMessage[]): number {
+  let n = 0
+  for (const m of msgs) { if (Array.isArray(m.content)) for (const part of m.content) if (part.type === 'image_url') n++ }
+  return n
 }
 /** Prepend a fixed global system prompt if enabled+non-empty. Shared by text/vision/streaming paths. */
 export function buildRequestMessages(apiMessages: ApiChatMessage[], settings: { customSystemPrompt: string; customSystemPromptEnabled: boolean }): ApiChatMessage[] {

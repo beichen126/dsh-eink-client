@@ -49,10 +49,10 @@ const api = await buildApiMessages([m], toDataUrl)
 const content = api[0].content as any[]
 assert(Array.isArray(content), 'image message content is an array')
 assert(content[0].type === 'text' && content[0].text === '解释这张图', 'text part first')
-assert(content.length === 3, 'text + 2 image_url parts (order preserved)')
-assert(content[1].type === 'image_url' && content[2].type === 'image_url', 'image_url parts')
-assert(content[1].image_url.url.startsWith('data:image/png;base64,'), 'first image uses its own data url')
-assert(content[2].image_url.url.startsWith('data:image/jpeg;base64,'), 'second image uses its own data url')
+assert(content.filter((p:any)=>p.type==='image_url').length === 2, 'text + 2 image_url parts (order preserved, labels interleaved)')
+const imgParts = content.filter((p:any)=>p.type==='image_url'); assert(imgParts[0].image_url.url.startsWith('data:image/png;base64,'), 'first image uses its own data url')
+assert(imgParts[1].image_url.url.startsWith('data:image/jpeg;base64,'), 'second image uses its own data url')
+assert(content.filter((p:any)=>p.type==='text').some((p:any)=>p.text==='【图片 1/2】') && content.some((p:any)=>p.type==='text' && p.text==='【图片 2/2】'), 'identity labels 【图片 k/2】 present')
 
 // case 11: plain text stays string
 const m2: Message = { id: newStableId(), role: 'user', content: '纯文本', images: [], createdAt: 1, updatedAt: 1 }
@@ -62,7 +62,7 @@ assert(typeof api2[0].content === 'string' && api2[0].content === '纯文本', '
 // case 13: historical image message reconstructed
 const m3: Message = { id: newStableId(), role: 'user', content: '追问', images: [idA], createdAt: 1, updatedAt: 1 }
 const api3 = await buildApiMessages([m3], toDataUrl)
-assert((api3[0].content as any[])[1].type === 'image_url', 'historical image re-resolved in later turn')
+assert((api3[0].content as any[]).filter((p:any)=>p.type==='image_url').length === 1 && (api3[0].content as any[]).some((p:any)=>p.type==='text' && p.text==='【图片 1/1】'), 'historical image re-resolved in later turn (1 image + 1 label)')
 
 // case 14: missing attachment -> clear error
 const missingId = newStableId()

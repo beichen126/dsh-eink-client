@@ -146,6 +146,7 @@ function Composer({ sessionId, busy }: { sessionId: string | undefined; busy: bo
       {picIds.length > 0 && (
         <div className={css.composerPics}>
           {picIds.map(id => <PendingThumb key={id} id={id} onRemove={() => removePic(id)} onOpen={() => setOpenId(id)} />)}
+          <span className={css.picCount}>已添加 {picIds.length} 张图片</span>
         </div>
       )}
       <div className={css.composerBar}>
