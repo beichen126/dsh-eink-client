@@ -27,12 +27,13 @@
     "test:stream2": "npx tsx scripts/test-stream-store2.ts",
     "test:annotation-ops": "npx tsx scripts/test-annotation-ops.ts",
     "test:annotation-storage": "npx tsx scripts/test-annotation-storage.ts",
-    "test:all": "npm run test:storage && npm run test:sse && npm run test:sse2 && npm run test:stream && npm run test:stream2 && npm run test:attachments && npm run test:attachments-atomic && npm run test:block && npm run test:table && npm run test:export && npm run test:math && npm run test:math-export && npm run test:multimodal && npm run test:multimodal-context && npm run test:annotation-ops && npm run test:annotation-storage && npm run test:annotation-ownership && npm run test:stream-preflight && npm run test:boot && npm run test:rename",
+    "test:all": "npm run test:storage && npm run test:sse && npm run test:sse2 && npm run test:stream && npm run test:stream2 && npm run test:attachments && npm run test:attachments-atomic && npm run test:block && npm run test:table && npm run test:export && npm run test:backup-validation && npm run test:math && npm run test:math-export && npm run test:multimodal && npm run test:multimodal-context && npm run test:annotation-ops && npm run test:annotation-storage && npm run test:annotation-ownership && npm run test:stream-preflight && npm run test:boot && npm run test:rename",
     "test:attachments-atomic": "npx tsx scripts/test-attachments-atomic.ts",
     "test:stream-preflight": "npx tsx scripts/test-stream-preflight.ts",
     "test:boot": "npx tsx scripts/test-boot.ts",
     "test:annotation-ownership": "npx tsx scripts/test-annotation-ownership.ts",
-    "test:multimodal-context": "npx tsx scripts/test-multimodal-context.ts"
+    "test:multimodal-context": "npx tsx scripts/test-multimodal-context.ts",
+    "test:backup-validation": "npx tsx scripts/test-backup-validation.ts"
   },
   "dependencies": {
     "@types/mdast": "^4.0.4",

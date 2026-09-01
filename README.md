@@ -9,8 +9,9 @@
 ## 上游来源与许可证
 
 - 上游仓库：https://github.com/deepseek-ai/deepseek-harness (branch `master`, commit `0a53fb55bea101816fa226bb964ae2bed71c343b`)
-- 上游许可证：MIT（见 `vendor/dsh/LICENSE`）
+- 上游许可证：MIT（MIT 全文见本仓库根目录 [LICENSE](./LICENSE)，版权归 DeepSeek 所有；来源与归属详见 [THIRD_PARTY_NOTICES](./THIRD_PARTY_NOTICES)）。
 - 从上游 `packages/client/*`、`apps/web` 复制到本工程的任何文件均保留原始版权/许可证信息；本工程当前为个人使用，但保持来源可追踪。
+- `vendor/dsh/` 仅为上游源码参考与迁移来源，被 .gitignore 排除、不进入公开仓库，也不是构建/运行依赖；因此上游 MIT 全文以根目录 `LICENSE` 形式随公开仓库一起发布。
 
 ## 与全局 DSH 的关系
 
