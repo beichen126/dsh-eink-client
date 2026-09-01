@@ -68,7 +68,7 @@ export function mapSelection(root: Element, messageId: string, range: Range, get
   const sm = messageOf(range.startContainer), em = messageOf(range.endContainer)
   if (sm !== messageId || em !== messageId) return { kind: 'unsupported', reason: 'cross-message' }
   // code block rejected (V1 selection must not pass through or sit in code)
-  const anyCode = Array.from(root.querySelectorAll('[data-annotatable="false"]')).some((el) => range.intersectsNode(el))
+  const anyCode = Array.from(root.querySelectorAll('[data-annotatable="false"]:not([data-math-id])')).some((el) => range.intersectsNode(el))
   if (anyCode) return { kind: 'unsupported', reason: 'code-block' }
   const leaves = collectLeaves(root)
   if (leaves.length === 0) return { kind: 'unsupported', reason: 'no-annotatable-content' }

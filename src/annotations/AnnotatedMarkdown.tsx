@@ -38,11 +38,6 @@ export function AnnotatedMarkdown({ content, messageId, conversationId }: { cont
       return null
     }
     function onPointerDown(e: Event) { pressedMath = nearestMath(e.target as any) }
-    function mathIntersects(msgEl: Element, range: Range): boolean {
-      const els = msgEl.querySelectorAll('[data-math-id]')
-      for (const el of els) if (range.intersectsNode(el)) return true
-      return false
-    }
     function onSelChange() {
       const sel = window.getSelection()
       // Math click: pointerup landed on a formula (collapsed or no text selection).
@@ -55,7 +50,9 @@ export function AnnotatedMarkdown({ content, messageId, conversationId }: { cont
       const mStart = nearestMath(range.startContainer as any)
       const mEnd = nearestMath(range.endContainer as any)
       if (mStart && mEnd && mStart.id === mEnd.id) { setPending({ kind: 'math', mathId: mStart.id, mathKind: mStart.kind }); setPendingBox(null); return }
-      if (mathIntersects(msgEl, range)) { setPending({ kind: 'unsupported', reason: 'mixed-math' }); setPendingBox(null); return }
+      // A selection that crosses inline math now falls through to mapSelection: the
+      // atomic math unit keeps text offsets aligned, so the passage (including a
+      // formula) is markable as one text annotation instead of the bar vanishing.
       const inMsg = (n: Node) => { for (let e: any = n; e; e = e.parentElement) if (e.getAttribute && e.getAttribute('data-message-id')) return true; return false }
       if (!inMsg(range.startContainer) || !inMsg(range.endContainer)) { setPending(null); setPendingBox(null); return }
       const result = mapSelection(msgEl, messageId, range, (b) => blocks.get(b))

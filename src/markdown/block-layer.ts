@@ -45,9 +45,11 @@ export function mathIdOf(messageId: string, kind: 'inline' | 'block', start: num
 }
 
 /** Flatten an mdast inline/block subtree to its continuous plain text (inline markup excluded). */
+export const MATH_ATOM = '\uFFFF'
 export function flattenText(node: any): string {
   if (node == null) return ''
   if (node.type === 'break') return '\n'                            // hard/soft break -> one canonical \n
+  if (node.type === 'inlineMath') return MATH_ATOM                  // one atomic canonical unit (matches the rendered DOM's math=1 counting)
   if (typeof node.value === 'string') return node.value            // text / code / html literal
   if (node.children) return node.children.map((c: any) => flattenText(c)).join('')
   return ''
