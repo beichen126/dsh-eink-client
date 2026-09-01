@@ -7,6 +7,7 @@ import { buildBlockMap } from './canonical'
 import { useMessageAnnotations, toggleMessageSelection, toggleTableCellsMessage, toggleWholeTableMessage, toggleMathMessage, refreshMessageAnnotations } from './annotation-store'
 import { setMessageRanges, removeMessageRanges, highlightSupported } from './highlight-registry'
 import { shouldToggleAll, normalizeBounds, hasExactRectangle, hasWholeTable, hasMath } from './annotation-ops'
+import { containsNode, ownedMath } from './ownership'
 import type { SelectionMapping, TextSelectionSegment } from './selection-types'
 import type { TableBounds } from './annotation-types'
 import css from './annotate.module.css'
@@ -41,32 +42,32 @@ export function AnnotatedMarkdown({ content, messageId, conversationId }: { cont
 
   useEffect(() => {
     let pressedMath: { id: string; kind: 'inline' | 'block' } | null = null
-    function nearestMath(el: any): { id: string; kind: 'inline' | 'block' } | null {
-      for (let e = el; e; e = e.parentElement) {
-        const id = e.getAttribute && e.getAttribute('data-math-id')
-        if (id) return { id, kind: e.getAttribute('data-math-kind') === 'block' ? 'block' : 'inline' }
-      }
-      return null
+    function onPointerDown(e: Event) {
+      // Ownership guard: only the instance whose wrapper contains the target may
+      // register a math press. A formula in ANOTHER message must never put this
+      // instance into pending-math.
+      pressedMath = ownedMath(wrapRef.current, e.target as any)
     }
-    function onPointerDown(e: Event) { pressedMath = nearestMath(e.target as any) }
     function onSelChange() {
       const sel = window.getSelection()
-      // Math click: pointerup landed on a formula (collapsed or no text selection).
+      // Math click: pointerup landed on a formula inside THIS message (guarded by
+      // ownedMath in onPointerDown). Only the owning instance may enter pending-math.
       if (pressedMath) { setPending({ kind: 'math', mathId: pressedMath.id, mathKind: pressedMath.kind }); setPendingBox(null); pressedMath = null; return }
       if (!sel || sel.rangeCount === 0) { setPending(null); setPendingBox(null); return }
+      if (sel.isCollapsed) { setPending(null); setPendingBox(null); return }
+      const range = sel.getRangeAt(0)
+      // Ownership: only respond to a selection ENTIRELY inside this message. A
+      // selection or formula in another message must never drive this instance.
+      if (!containsNode(wrapRef.current, range.startContainer) || !containsNode(wrapRef.current, range.endContainer)) { setPending(null); setPendingBox(null); return }
       const msgEl = wrapRef.current?.querySelector('[data-message-id]')
       if (!msgEl) { setPending(null); setPendingBox(null); return }
-      if (sel.isCollapsed) { setPending(null); setPendingBox(null); return }
       try {
-        const range = sel.getRangeAt(0)
-        const mStart = nearestMath(range.startContainer as any)
-        const mEnd = nearestMath(range.endContainer as any)
+        const mStart = ownedMath(wrapRef.current, range.startContainer as any)
+        const mEnd = ownedMath(wrapRef.current, range.endContainer as any)
         if (mStart && mEnd && mStart.id === mEnd.id) { setPending({ kind: 'math', mathId: mStart.id, mathKind: mStart.kind }); setPendingBox(null); return }
         // A selection that crosses inline math now falls through to mapSelection: the
         // atomic math unit keeps text offsets aligned, so the passage (including a
         // formula) is markable as one text annotation instead of the bar vanishing.
-        const inMsg = (n: Node) => { for (let e: any = n; e; e = e.parentElement) if (e.getAttribute && e.getAttribute('data-message-id')) return true; return false }
-        if (!inMsg(range.startContainer) || !inMsg(range.endContainer)) { setPending(null); setPendingBox(null); return }
         const result = mapSelection(msgEl, messageId, range, (b) => blocks.get(b))
         if (result.kind === 'text' && result.segments.length) { setPending(result); const r = range.getBoundingClientRect(); setPendingBox({ left: Math.min(r.left + r.width, window.innerWidth - 90), top: Math.max(8, r.top - 44) }) }
         else if (result.kind === 'table-cross-cell') { setPending(result); const r = range.getBoundingClientRect(); setPendingBox({ left: Math.min(r.left + r.width, window.innerWidth - 90), top: Math.max(8, r.top - 44) }) }
