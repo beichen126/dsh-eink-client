@@ -1,6 +1,6 @@
 // attachmentService — the single authority for attachment lifecycle. The UI never touches IndexedDB, Blob, objectURL, or base64 directly.
 import { newStableId, type Attachment, type StableId } from './types'
-import { saveAttachment, getAttachmentRow, deleteAttachment as deleteAttachmentRow, attachmentExists } from '../storage/storage'
+import { saveAttachments, getAttachmentRow, deleteAttachment as deleteAttachmentRow, attachmentExists } from '../storage/storage'
 
 export type AttachmentErrorKind = 'unsupported-format' | 'read-failed' | 'missing-attachment' | 'image-too-large' | 'vision-unsupported'
 export class AttachmentError extends Error { readonly kind: AttachmentErrorKind; constructor(kind: AttachmentErrorKind, m: string) { super(m); this.kind = kind } }
@@ -21,17 +21,21 @@ const urlRegistry = new Map<string, { url: string; refs: number }>()
 
 export function isSupportedImage(file: { type: string; size: number }): boolean { return SUPPORTED_MIME.has(file.type) && file.size > 0 }
 
+/**
+ * Persist a batch of files. All-or-nothing: we FIRST validate every file, and only if
+ * all pass do we write them in ONE IndexedDB readwrite transaction. A single invalid
+ * / too-large file aborts the whole batch and leaves no orphan blobs behind.
+ */
 export async function saveFiles(files: File[]): Promise<Attachment[]> {
   const now = Date.now()
-  const out: Attachment[] = []
+  const metas: Attachment[] = []
   for (const f of files) {
     if (!isSupportedImage(f)) throw new AttachmentError('unsupported-format', 'unsupported image')
     if (f.size > MAX_IMAGE_BYTES) throw new AttachmentError('image-too-large', 'image too large')
-    const a: Attachment = { id: newStableId(), name: f.name, mimeType: f.type, size: f.size, createdAt: now, updatedAt: now }
-    await saveAttachment(a, f)
-    out.push(a)
+    metas.push({ id: newStableId(), name: f.name, mimeType: f.type, size: f.size, createdAt: now, updatedAt: now })
   }
-  return out
+  if (metas.length) await saveAttachments(metas, files)
+  return metas
 }
 
 export async function getAttachment(id: StableId): Promise<Attachment | undefined> { const row = await getAttachmentRow(id); return row ? row.meta : undefined }

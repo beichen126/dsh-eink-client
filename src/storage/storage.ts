@@ -10,6 +10,8 @@ export async function saveConversation(conv) { await idbPut('conversations', con
 export async function deleteConversation(id) { await idbDelete('conversations', id) }
 
 export async function saveAttachment(a, blob) { await idbPut('attachments', { id: a.id, meta: a, blob }) }
+/** Batch-write attachments in ONE readwrite transaction (all-or-nothing). */
+export async function saveAttachments(metas, blobs) { await idbBatchPut('attachments', metas.map((m, i) => ({ id: m.id, meta: m, blob: blobs[i] }))) }
 export async function getAttachmentRow(id) { return idbGet('attachments', id) }
 export async function deleteAttachment(id) { await idbDelete('attachments', id) }
 export async function attachmentExists(id) { return !!(await idbGet('attachments', id)) }

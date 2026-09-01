@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AppFrame } from './dsh/layout/AppFrame'
 import { useSessions, initStore } from './engine/sessions-store'
@@ -19,16 +19,26 @@ function renderSlot(key: string, owner?: any): ReactNode {
   return null
 }
 
+type BootState = 'loading' | 'ready' | 'error'
+
 export function App() {
-  const ready = useSessions(s => s.ready)
   const settingsOpen = useUi(s => s.settingsOpen)
-  useEffect(() => { void (async () => { await initSettings(); await initStore() })() }, [])
-  if (!ready) {
+  const [boot, setBoot] = useState<BootState>('loading')
+  const bootFn = useCallback(async () => {
+    setBoot('loading')
+    try { await initSettings(); await initStore(); setBoot('ready') }
+    catch (e) { console.error('本地数据载入失败', e); setBoot('error') }
+  }, [])
+  useEffect(() => { void bootFn() }, [bootFn])
+  if (boot !== 'ready') {
     return (
       <div className="eink-boot">
         <div className="eink-boot-card">
           <div className="eink-boot-title">{t('brand.localBuild')}</div>
-          <div className="eink-boot-hint">正在载入本地会话…</div>
+          {boot === 'loading'
+            ? <div className="eink-boot-hint">正在载入本地会话…</div>
+            : <div className="eink-boot-error">本地数据载入失败</div>}
+          {boot === 'error' && <button className="eink-boot-retry" onClick={() => void bootFn()}>重试</button>}
         </div>
       </div>
     )

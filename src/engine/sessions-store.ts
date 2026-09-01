@@ -4,7 +4,7 @@ import { sanitizeTitle } from './session-title'
 import { getSetting, setSetting, saveConversation, deleteConversation, listConversations } from '../storage/storage'
 import { getSettingsSnapshot } from './settings-store'
 import { streamTextChat, DeepSeekError, errorKindLabel, buildApiMessages, buildRequestMessages, countImageParts, isVisionModel } from '../api/deepseek'
-import { toDataUrl, deleteAttachment, attachmentErrorLabel } from './attachment-service'
+import { toDataUrl, deleteAttachment, attachmentErrorLabel, AttachmentError } from './attachment-service'
 import { deleteConvAnnotations } from '../annotations/annotation-service'
 
 export type { Conversation as ChatSession, Message as ChatMsg, Attachment as ChatImage }
@@ -29,6 +29,7 @@ const subscribe = (fn: () => void) => { subs.add(fn); return () => { subs.delete
 const getSnapshot = () => state
 export function useSessions<T>(sel: (s: SessionsState) => T): T { return useSyncExternalStore(subscribe, () => sel(state)) }
 export function getSessionsStatus(): RequestStatus { return state.status }
+export function getSessionsSendError(): string | undefined { return state.sendError }
 
 function index(list: Conversation[]): Record<string, Conversation> {
   const m: Record<string, Conversation> = {}; for (const c of list) m[c.id] = c; return m
@@ -71,14 +72,8 @@ export const sessionsActions = {
     const settings = getSettingsSnapshot()
     if (!settings.apiKey) { setState({ ...state, status: 'error', sendError: errorKindLabel('no-api-key') }); return }
 
-    // assistant placeholder: ONE stable id for the whole stream
     const assistantId = newStableId()
-    const placeholder: Message = { id: assistantId, role: 'assistant', content: '', images: [], createdAt: now, updatedAt: now }
-    const withPlaceholder: Conversation = { ...afterUser, updatedAt: now, messages: [...afterUser.messages, placeholder] }
-    upsertState(withPlaceholder, { status: 'streaming', sendError: undefined })
-
     const controller = new AbortController()
-    abortControllerRef = controller
     let received = ''
     let lastCommit = 0
     const commit = () => {
@@ -92,8 +87,10 @@ export const sessionsActions = {
     }
     const onDelta = (d: string) => { received += d; const t = Date.now(); if (t - lastCommit >= streamRenderIntervalMs) { lastCommit = t; commit() } }
     try {
+      // --- LOCAL PREFLIGHT (no network, and NO assistant placeholder yet) ---
+      // A preflight failure must not leave a ghost empty assistant message behind.
       const hasImages = afterUser.messages.some(x => x.images.length > 0)
-      if (hasImages && !isVisionModel(settings.model)) { setState({ ...state, status: 'error', sendError: attachmentErrorLabel('vision-unsupported') }); abortControllerRef = null; return }
+      if (hasImages && !isVisionModel(settings.model)) { setState({ ...state, status: 'error', sendError: attachmentErrorLabel('vision-unsupported') }); return }
       const apiMessages = await buildApiMessages(afterUser.messages, toDataUrl)
       const reqMessages = buildRequestMessages(apiMessages, settings)
       // Invariant (§16): the outgoing request must encode exactly the images the user
@@ -102,9 +99,15 @@ export const sessionsActions = {
       const encodedImages = countImageParts(reqMessages)
       if (encodedImages !== expectedImages) {
         setState({ ...state, status: 'error', sendError: '图片准备失败：已选择 ' + expectedImages + ' 张，实际仅准备成功 ' + encodedImages + ' 张。请检查附件后重试。' })
-        abortControllerRef = null
         return
       }
+
+      // --- only NOW create the assistant placeholder (ONE stable id for the whole stream) ---
+      const placeholder: Message = { id: assistantId, role: 'assistant', content: '', images: [], createdAt: now, updatedAt: now }
+      const withPlaceholder: Conversation = { ...afterUser, updatedAt: now, messages: [...afterUser.messages, placeholder] }
+      upsertState(withPlaceholder, { status: 'streaming', sendError: undefined })
+      abortControllerRef = controller
+
       const r = await streamTextChat({ apiKey: settings.apiKey, baseUrl: settings.apiBaseUrl, model: settings.model, messages: reqMessages, signal: controller.signal, onDelta })
       received = r.content
       commit()
@@ -113,10 +116,13 @@ export const sessionsActions = {
       setState({ ...state, status: 'idle', sendError: undefined })
       abortControllerRef = null
     } catch (e) {
-      const err = e instanceof DeepSeekError ? e : new DeepSeekError('network-or-cors', String(e))
       commit()
       const cur = state.byId[id]
       if (cur) await saveConversation(cur)
+      // Attachment errors keep their own semantics — a missing/corrupt image should
+      // read as an attachment problem, never as a network/CORS failure.
+      if (e instanceof AttachmentError) { setState({ ...state, status: 'error', sendError: attachmentErrorLabel(e.kind) }); abortControllerRef = null; return }
+      const err = e instanceof DeepSeekError ? e : new DeepSeekError('network-or-cors', String(e))
       if (err.kind === 'aborted') { setState({ ...state, status: 'idle', sendError: undefined }) }
       else { const label = errorKindLabel(err.kind) + (err.status ? ('（HTTP ' + err.status + '）') : ''); setState({ ...state, status: 'error', sendError: label }) }
       abortControllerRef = null
