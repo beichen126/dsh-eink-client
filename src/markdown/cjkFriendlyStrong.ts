@@ -45,12 +45,17 @@ const tokenizeCjkFriendlyAttention: Tokenizer = function (effects, ok, nok) {
 
     const token = effects.exit('attentionSequence')
     const after = classifyCharacter(code)
+    const markerCount = token.end.offset - token.start.offset
+    // CJK-friendly both directions: open when a CJK char precedes a word/punctuation
+    // sequence, so **（定义）**covers prose that starts with punctuation too.
+    const cjkStrongOpen = markerCount >= 2
+      && isCjkCharacter(previous)
+      && (isCjkCharacter(code) || after === constants.characterGroupPunctuation)
     const open = !after || (after === constants.characterGroupPunctuation && Boolean(before))
-      || attentionMarkers.includes(code)
+      || attentionMarkers.includes(code) || cjkStrongOpen
     const commonMarkClose = !before
       || (before === constants.characterGroupPunctuation && Boolean(after))
       || attentionMarkers.includes(previous)
-    const markerCount = token.end.offset - token.start.offset
     const cjkStrongClose = markerCount >= 2
       && unicodePunctuation(previous)
       && isCjkCharacter(code)
